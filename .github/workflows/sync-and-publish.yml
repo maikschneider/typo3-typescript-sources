@@ -229,12 +229,12 @@ jobs:
           Source: https://github.com/TYPO3/typo3/tree/${TYPO3_VERSION}
           Path: Build/Sources/TypeScript/"
           
-          # Erstelle Tag
+          # Erstelle Tag (entferne v-Prefix falls vorhanden)
           NPM_VERSION="${TYPO3_VERSION#v}"
-          git tag -a "v${NPM_VERSION}" -m "Release ${NPM_VERSION} from TYPO3 ${TYPO3_VERSION}"
+          git tag -a "${NPM_VERSION}" -m "Release ${NPM_VERSION} from TYPO3 ${TYPO3_VERSION}"
           
           git push origin main
-          git push origin "v${NPM_VERSION}"
+          git push origin "${NPM_VERSION}"
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -258,7 +258,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
         with:
-          tag_name: v${{ needs.check-and-sync.outputs.typo3_version }}
+          tag_name: ${{ needs.check-and-sync.outputs.typo3_version }}
           release_name: TYPO3 ${{ needs.check-and-sync.outputs.typo3_version }}
           body: |
             Synchronized with TYPO3 Core ${{ needs.check-and-sync.outputs.typo3_version }}
