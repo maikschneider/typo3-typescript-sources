@@ -1,0 +1,34 @@
+{
+  "name": "@maikschneider/typo3-typescript-sources",
+  "version": "13.4.20",
+  "description": "TYPO3 Core TypeScript Sources - Extracted from TYPO3/typo3 repository",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "scripts": {
+    "test": "echo \"No tests specified\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/maikschneider/typo3-typescript-sources.git"
+  },
+  "keywords": [
+    "typo3",
+    "typescript",
+    "sources",
+    "cms"
+  ],
+  "author": "TYPO3 Core Team",
+  "license": "GPL-2.0-or-later",
+  "bugs": {
+    "url": "https://github.com/maikschneider/typo3-typescript-sources/issues"
+  },
+  "homepage": "https://github.com/maikschneider/typo3-typescript-sources#readme",
+  "publishConfig": {
+    "access": "public"
+  },
+  "typo3": {
+    "sourceRepository": "https://github.com/TYPO3/typo3",
+    "sourceTag": "v13.4.20",
+    "sourcePath": "Build/Sources/TypeScript"
+  }
+}
