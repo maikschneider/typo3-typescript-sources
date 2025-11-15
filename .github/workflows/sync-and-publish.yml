@@ -133,7 +133,7 @@ jobs:
           
           cat > package.json << EOF
           {
-            "name": "@maikschneider/typo3-typescript-sources",
+            "name": "typo3-typescript-sources",
             "version": "${NPM_VERSION}",
             "description": "TYPO3 Core TypeScript Sources - Extracted from TYPO3/typo3 repository",
             "main": "index.js",
@@ -183,7 +183,7 @@ jobs:
           ## 📦 Installation
 
           ```bash
-          npm install @maikschneider/typo3-typescript-sources
+          npm install typo3-typescript-sources
           ```
 
           ## 🔍 Source
@@ -241,7 +241,11 @@ jobs:
       - name: Publish to npm
         working-directory: split-repo
         run: |
-          npm publish
+          # Stelle sicher, dass .npmrc korrekt konfiguriert ist
+          echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}" > ~/.npmrc
+          
+          # Publish ohne OTP (Automation Token)
+          npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
