@@ -5,7 +5,7 @@ This repository contains the TypeScript sources from the TYPO3 Core, automatical
 ## 📦 Installation
 
 ```bash
-npm install @maikschneider/typo3-typescript-sources
+npm install typo3-typescript-sources
 ```
 
 ## 🔍 Source

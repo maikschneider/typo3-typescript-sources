@@ -1,5 +1,5 @@
 {
-  "name": "@maikschneider/typo3-typescript-sources",
+  "name": "typo3-typescript-sources",
   "version": "13.4.20",
   "description": "TYPO3 Core TypeScript Sources - Extracted from TYPO3/typo3 repository",
   "main": "index.js",
