@@ -1,5 +1,9 @@
 # TYPO3 TypeScript Sources
 
+[![Sync and Publish](https://github.com/maikschneider/typo3-typescript-sources/actions/workflows/sync-and-publish.yml/badge.svg)](https://github.com/maikschneider/typo3-typescript-sources/actions/workflows/sync-and-publish.yml)
+[![npm version](https://badge.fury.io/js/typo3-typescript-sources.svg)](https://www.npmjs.com/package/typo3-typescript-sources)
+[![License: GPL v2](https://img.shields.io/badge/License-GPL%20v2-blue.svg)](https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html)
+
 This repository contains the TypeScript sources from the TYPO3 Core, automatically extracted and published to npm.
 
 ## 📦 Installation
@@ -12,7 +16,7 @@ npm install typo3-typescript-sources
 
 - **Original Repository:** [TYPO3/typo3](https://github.com/TYPO3/typo3)
 - **Source Path:** `Build/Sources/TypeScript/`
-- **Current TYPO3 Version:** `v13.4.20`
+- **Current TYPO3 Version:** `v13.4.21`
 
 ## 📝 License
 

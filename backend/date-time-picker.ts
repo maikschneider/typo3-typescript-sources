@@ -185,6 +185,8 @@ class DateTimePicker {
           // collides with using altInput – sigh.
           self.altInput.id = self.input.id;
           self.input.removeAttribute('id');
+          // Disable browser autofill to prevent interference with the datepicker
+          self.altInput.setAttribute('autocomplete', 'off');
           self.altInput.clearable();
           if (self.input.dataset.formengineInputName !== undefined) {
             self.altInput.dataset.formengineDatepickerRealInputName = self.input.dataset.formengineInputName;
@@ -196,6 +198,13 @@ class DateTimePicker {
               self.altInput.classList.toggle('has-error', !e.detail.isValid);
             }
           });
+
+          // Move the hidden input (self.input) to right after the clearable wrapper
+          // This prevents it from affecting :first-child CSS selectors while maintaining proper DOM order
+          const wrapper = self.altInput.closest('.form-control-clearable-wrapper');
+          if (wrapper !== null) {
+            wrapper.insertAdjacentElement('afterend', self.input);
+          }
         }
       },
       onChange: (dates: Date[], currentDateString: string, self: flatpickr.Instance): void => {
