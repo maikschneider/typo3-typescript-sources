@@ -1,6 +1,6 @@
 {
   "name": "typo3-typescript-sources",
-  "version": "13.4.23",
+  "version": "13.4.24",
   "description": "TYPO3 Core TypeScript Sources - Extracted from TYPO3/typo3 repository",
   "main": "index.js",
   "types": "index.d.ts",
@@ -28,7 +28,7 @@
   },
   "typo3": {
     "sourceRepository": "https://github.com/TYPO3/typo3",
-    "sourceTag": "v13.4.23",
+    "sourceTag": "v13.4.24",
     "sourcePath": "Build/Sources/TypeScript"
   }
 }
