@@ -13,7 +13,7 @@
 
 import LiveSearchConfigurator from '@typo3/backend/live-search/live-search-configurator';
 import Viewport from '@typo3/backend/viewport';
-import { customElement, property, query } from 'lit/decorators';
+import { customElement, property, query } from 'lit/decorators.js';
 import { html, LitElement, nothing, type TemplateResult } from 'lit';
 import { lll } from '@typo3/core/lit-helper';
 import { type ItemContainer } from './item/item-container';
@@ -35,6 +35,7 @@ export const componentName = 'typo3-backend-live-search-result-container';
 @customElement('typo3-backend-live-search-result-container')
 export class ResultContainer extends LitElement {
   @property({ type: Object }) results: ResultItemInterface[] | null = null;
+  @property({ type: Boolean, attribute: false }) hasErrors: boolean = false;
   @property({ type: Boolean, attribute: false }) loading: boolean = false;
 
   @query('typo3-backend-live-search-result-item-container') itemContainer: ItemContainer;
@@ -62,6 +63,10 @@ export class ResultContainer extends LitElement {
   protected override render(): TemplateResult | symbol {
     if (this.loading) {
       return html`<div class="d-flex flex-fill align-items-center justify-content-center"><typo3-backend-spinner size="large"></typo3-backend-spinner></div>`;
+    }
+
+    if (this.hasErrors) {
+      return html`<div class="alert alert-danger">${lll('liveSearch_hasErrors')}</div>`;
     }
 
     if (this.results === null) {
