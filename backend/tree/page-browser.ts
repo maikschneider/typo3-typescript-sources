@@ -85,7 +85,7 @@ export class PageBrowserTree extends PageTree {
    */
   private isLinkable(node: TreeNodeInterface): boolean {
     const nonLinkableDoktypes = ['199', '254', '255'];
-    return nonLinkableDoktypes.includes(String(node.recordType)) === false;
+    return nonLinkableDoktypes.includes(String(node.doktype)) === false;
   }
 
   /**
@@ -169,8 +169,6 @@ export class PageBrowser extends LitElement {
     return this.getConfiguration()
       .then((configuration: Configuration): TemplateResult => {
         const initialized = () => {
-          this.tree.addEventListener('typo3:tree:node-selected', this.loadRecordsOfPage);
-          this.tree.addEventListener('typo3:tree:nodes-prepared', this.selectActivePageInTree);
           // set up toolbar now with updated properties
           const toolbar = this.querySelector('typo3-backend-tree-toolbar') as TreeToolbar;
           toolbar.tree = this.tree;
@@ -180,7 +178,14 @@ export class PageBrowser extends LitElement {
           <typo3-backend-tree-toolbar .tree="${this.tree}"></typo3-backend-tree-toolbar>
           <div class="navigation-tree-container">
             ${this.renderMountPoint()}
-            <typo3-backend-component-page-browser-tree id="typo3-pagetree-tree" class="tree-wrapper" .setup=${configuration} @tree:initialized=${initialized}></typo3-backend-component-page-browser-tree>
+            <typo3-backend-component-page-browser-tree
+              id="typo3-pagetree-tree"
+              class="tree-wrapper"
+              .setup=${configuration}
+              @tree:initialized=${initialized}
+              @typo3:tree:node-selected=${this.loadRecordsOfPage}
+              @typo3:tree:nodes-prepared=${this.selectActivePageInTree}
+            ></typo3-backend-component-page-browser-tree>
           </div>
         `;
       });
