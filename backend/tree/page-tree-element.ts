@@ -31,6 +31,7 @@ import { DataTransferTypes } from '@typo3/backend/enum/data-transfer-types';
 import type { AjaxResponse } from '@typo3/core/ajax/ajax-response';
 import type { DragTooltipMetadata } from '@typo3/backend/drag-tooltip';
 import type { DataTransferStringItem } from '@typo3/backend/tree/tree';
+import '@typo3/backend/viewport/content-navigation-toggle';
 import 'bootstrap'; // for data-bs-toggle="dropdown"
 
 /**
@@ -313,7 +314,7 @@ interface Configuration {
 export class PageTreeNavigationComponent extends TreeModuleState(LitElement) {
   @property({ type: String }) mountPointPath: string = null;
 
-  @query('.tree-wrapper') tree: EditablePageTree;
+  @query('typo3-backend-navigation-component-pagetree-tree') tree: EditablePageTree;
   @query('typo3-backend-navigation-component-pagetree-toolbar') toolbar: PageTreeToolbar;
 
   protected override moduleStateType: string = 'web';
@@ -341,9 +342,7 @@ export class PageTreeNavigationComponent extends TreeModuleState(LitElement) {
 
   protected override render(): TemplateResult {
     return html`
-      <div id="typo3-pagetree" class="tree">
       ${until(this.renderTree(), '')}
-      </div>
     `;
   }
 
@@ -366,18 +365,15 @@ export class PageTreeNavigationComponent extends TreeModuleState(LitElement) {
     const configuration = await this.getConfiguration();
     return html`
       <typo3-backend-navigation-component-pagetree-toolbar id="typo3-pagetree-toolbar" .tree="${this.tree}"></typo3-backend-navigation-component-pagetree-toolbar>
-      <div id="typo3-pagetree-treeContainer" class="navigation-tree-container">
-        ${this.renderMountPoint()}
-        <typo3-backend-navigation-component-pagetree-tree
-            id="typo3-pagetree-tree"
-            class="tree-wrapper"
-            .setup=${configuration}
-            @tree:initialized=${() => { this.toolbar.tree = this.tree; this.fetchActiveNodeIfMissing(); }}
-            @typo3:tree:node-selected=${this.loadContent}
-            @typo3:tree:node-context=${this.showContextMenu}
-            @typo3:tree:nodes-prepared=${this.selectActiveNodeInLoadedNodes}
-        ></typo3-backend-navigation-component-pagetree-tree>
-      </div>
+      ${this.renderMountPoint()}
+      <typo3-backend-navigation-component-pagetree-tree
+          id="typo3-pagetree-tree"
+          .setup=${configuration}
+          @tree:initialized=${() => { this.toolbar.tree = this.tree; this.fetchActiveNodeIfMissing(); }}
+          @typo3:tree:node-selected=${this.loadContent}
+          @typo3:tree:node-context=${this.showContextMenu}
+          @typo3:tree:nodes-prepared=${this.selectActiveNodeInLoadedNodes}
+      ></typo3-backend-navigation-component-pagetree-tree>
     `;
   }
 
@@ -477,6 +473,18 @@ class PageTreeToolbar extends TreeToolbar {
   @property({ type: EditablePageTree })
   override tree: EditablePageTree = null;
 
+  @property({ type: Boolean })
+  searchInTranslatedPages: boolean = false;
+
+  protected override updated(changedProperties: Map<PropertyKey, unknown>): void {
+    super.updated(changedProperties);
+
+    // Update searchInTranslatedPages when tree property changes (initial load or tree replacement)
+    if (changedProperties.has('tree') && this.tree?.settings?.searchInTranslatedPagesEnabled !== undefined) {
+      this.searchInTranslatedPages = this.tree.settings.searchInTranslatedPagesEnabled;
+    }
+  }
+
   protected override render(): TemplateResult {
     /* eslint-disable @stylistic/indent */
     return html`
@@ -486,32 +494,13 @@ class PageTreeToolbar extends TreeToolbar {
               <label for="toolbarSearch" class="visually-hidden">
                 ${lll('labels.label.searchString')}
               </label>
-              <input type="search" id="toolbarSearch" class="form-control form-control-sm search-input" placeholder="${lll('tree.searchPageTree')}">
+              <input type="search" autocomplete="off" id="toolbarSearch" class="form-control form-control-sm search-input" placeholder="${lll('tree.searchPageTree')}">
           </div>
-        </div>
-        <div class="tree-toolbar__submenu">
-          ${this.tree?.settings?.doktypes?.length
-        ? this.tree.settings.doktypes.map((item: any) => {
-          return html`
-                <div
-                  class="tree-toolbar__menuitem tree-toolbar__drag-node"
-                  title="${item.title}"
-                  draggable="true"
-                  data-tree-icon="${item.icon}"
-                  data-node-type="${item.nodeType}"
-                  aria-hidden="true"
-                  @dragstart="${(event: DragEvent) => { this.handleDragStart(event, item); }}"
-                >
-                  <typo3-backend-icon identifier="${item.icon}" size="small"></typo3-backend-icon>
-                </div>
-              `;
-        })
-        : ''
-      }
           <button
             type="button"
             class="btn btn-sm btn-icon btn-default btn-borderless"
             data-bs-toggle="dropdown"
+            data-bs-boundary="window"
             aria-expanded="false"
             aria-label="${lll('labels.openPageTreeOptionsMenu')}"
           >
@@ -542,10 +531,74 @@ class PageTreeToolbar extends TreeToolbar {
                 </span>
               </button>
             </li>
+            ${this.tree?.settings?.searchInTranslatedPagesAvailable ? html`
+              <li>
+                <hr class="dropdown-divider">
+              </li>
+              <li>
+                <button class="dropdown-item" @click="${() => this.toggleTranslationSearch()}">
+                  <span class="dropdown-item-columns">
+                    <span class="dropdown-item-column dropdown-item-column-icon" aria-hidden="true">
+                      <typo3-backend-icon identifier="${this.searchInTranslatedPages ? 'actions-check-square' : 'actions-selection'}" size="small"></typo3-backend-icon>
+                    </span>
+                    <span class="dropdown-item-column dropdown-item-column-title">
+                      ${lll('tree.search_in_translated_pages')}
+                    </span>
+                  </span>
+                </button>
+              </li>
+            ` : nothing}
           </ul>
+          <typo3-backend-content-navigation-toggle
+            class="btn btn-sm btn-icon btn-default btn-borderless"
+            action="collapse"
+          >
+          </typo3-backend-content-navigation-toggle>
+        </div>
+        <div class="tree-toolbar__submenu">
+          ${this.tree?.settings?.doktypes?.length
+        ? this.tree.settings.doktypes.map((item: any) => {
+          return html`
+                <div
+                  class="tree-toolbar__menuitem tree-toolbar__drag-node"
+                  title="${item.title}"
+                  draggable="true"
+                  data-tree-icon="${item.icon}"
+                  data-node-type="${item.nodeType}"
+                  aria-hidden="true"
+                  @dragstart="${(event: DragEvent) => { this.handleDragStart(event, item); }}"
+                >
+                  <typo3-backend-icon identifier="${item.icon}" size="small"></typo3-backend-icon>
+                </div>
+              `;
+        })
+        : ''
+      }
         </div>
       </div>
     `;
+  }
+
+  protected async toggleTranslationSearch(): Promise<void> {
+    const newValue = !this.searchInTranslatedPages;
+
+    try {
+      await Persistent.set('pageTree_searchInTranslatedPages', newValue ? '1' : '0');
+
+      // Update both local state and tree settings
+      this.searchInTranslatedPages = newValue;
+      if (this.tree?.settings) {
+        this.tree.settings.searchInTranslatedPagesEnabled = newValue;
+      }
+
+      // Refresh the tree if there's an active search
+      const searchInput = this.querySelector('.search-input') as HTMLInputElement;
+      if (searchInput && searchInput.value.trim() !== '') {
+        this.refreshTree();
+      }
+    } catch (error) {
+      console.error('Failed to toggle translation search:', error);
+    }
   }
 
   protected handleDragStart(event: DragEvent, item: any): void {

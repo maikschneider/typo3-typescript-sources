@@ -14,7 +14,6 @@
 import { lll } from '@typo3/core/lit-helper';
 import Modal from '../modal';
 import '@typo3/backend/element/icon-element';
-import '@typo3/backend/input/clearable';
 import '../live-search/element/hint';
 import '../live-search/element/result/result-pagination';
 import '../live-search/element/search-option-item';
@@ -149,11 +148,11 @@ class LiveSearch {
           optionCounterElement.classList.toggle('hidden', count === 0);
         }).bindTo(searchForm);
 
-        searchField.clearable({
-          onClear: (): void => {
+        new RegularEvent('search', (): void => {
+          if (searchField.value === '') {
             searchForm.requestSubmit();
-          },
-        });
+          }
+        }).bindTo(searchField);
 
         const searchResultContainer: ResultContainer = document.querySelector('typo3-backend-live-search-result-container');
         new RegularEvent('live-search:item-chosen', (): void => {
@@ -223,10 +222,12 @@ class LiveSearch {
     const query = formData.get('query').toString();
 
     if (query === '') {
-      this.updateSearchResults(null);
+      this.updateSearchResults();
     } else {
       const searchResultContainer = document.querySelector(resultContainerComponentName) as ResultContainer;
+      const paginationElement: ResultPagination = document.querySelector('typo3-backend-live-search-result-pagination');
       searchResultContainer.loading = true;
+      paginationElement.loading = true;
 
       this.currentSearchRequest?.abort();
       try {
@@ -236,6 +237,7 @@ class LiveSearch {
         this.currentSearchRequest = null;
         this.updateSearchResults(json);
       } catch (err: unknown) {
+        this.updateSearchResults(null, true);
         if (err instanceof DOMException && err.name === 'AbortError') {
           // Request has been aborted, do not flood the error console
           return;
@@ -259,10 +261,11 @@ class LiveSearch {
     firstSearchResultItem?.focus();
   }
 
-  private updateSearchResults(response: SearchResponse): void {
+  private updateSearchResults(response: SearchResponse = null, hasErrors: boolean = false): void {
     const searchResultContainer: ResultContainer = document.querySelector('typo3-backend-live-search-result-container');
     searchResultContainer.results = response?.results ?? null;
     searchResultContainer.loading = false;
+    searchResultContainer.hasErrors = hasErrors;
 
     this.updatePagination(response?.pagination ?? null);
   }
@@ -270,6 +273,7 @@ class LiveSearch {
   private updatePagination(pagination: Pagination): void {
     const paginationElement: ResultPagination = document.querySelector('typo3-backend-live-search-result-pagination');
     paginationElement.pagination = pagination;
+    paginationElement.loading = false;
   }
 }
 
