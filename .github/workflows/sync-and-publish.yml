@@ -2,12 +2,12 @@ name: Sync TYPO3 TypeScript Sources and Publish
 
 on:
   schedule:
-    # Prüfe täglich um 2 Uhr morgens auf neue Tags
+    # Check daily at 2 AM for new tags
     - cron: '0 2 * * *'
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Spezifischer TYPO3 Tag (z.B. v13.4.0)'
+        description: 'Specific TYPO3 tag (e.g. v14.0.0 or v13.4.0)'
         required: false
         type: string
 
@@ -17,47 +17,63 @@ jobs:
     outputs:
       has_new_version: ${{ steps.check.outputs.has_new_version }}
       typo3_version: ${{ steps.check.outputs.typo3_version }}
+      target_branch: ${{ steps.config.outputs.target_branch }}
+      major_version: ${{ steps.config.outputs.major_version }}
     steps:
       - name: Checkout split repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
+      - name: Determine TYPO3 major version from branch
+        id: config
+        run: |
+          BRANCH="${{ github.ref_name }}"
+          if [[ "$BRANCH" == v13* ]]; then
+            echo "major_version=13" >> $GITHUB_OUTPUT
+            echo "target_branch=v13.x" >> $GITHUB_OUTPUT
+          else
+            echo "major_version=14" >> $GITHUB_OUTPUT
+            echo "target_branch=main" >> $GITHUB_OUTPUT
+          fi
+
       - name: Check for new TYPO3 tags
         id: check
         run: |
-          # Hole alle Tags vom TYPO3 Repository
+          MAJOR="${{ steps.config.outputs.major_version }}"
+
+          # Fetch all tags from TYPO3 repository for the target major version
           git ls-remote --tags https://github.com/TYPO3/typo3.git | \
-            grep -E 'refs/tags/v13\.[0-9]+\.[0-9]+$' | \
+            grep -E "refs/tags/v${MAJOR}\.[0-9]+\.[0-9]+$" | \
             sed 's/.*refs\/tags\///' | \
             sort -V > /tmp/typo3_tags.txt
-          
-          # Hole den letzten verarbeiteten Tag (falls vorhanden)
+
+          # Get last synced tag
           LAST_SYNCED=""
           if [ -f .last-synced-tag ]; then
             LAST_SYNCED=$(cat .last-synced-tag)
           fi
-          
-          # Manueller Tag-Input hat Priorität
+
+          # Manual tag input takes priority
           if [ -n "${{ github.event.inputs.tag }}" ]; then
             NEW_TAG="${{ github.event.inputs.tag }}"
-            echo "Manuell angegebener Tag: $NEW_TAG"
+            echo "Manually specified tag: $NEW_TAG"
           else
-            # Finde neuesten Tag der noch nicht synced wurde
+            # Find newest tag that has not been synced yet
             NEW_TAG=$(tail -n1 /tmp/typo3_tags.txt)
           fi
-          
+
           if [ -z "$NEW_TAG" ]; then
-            echo "Kein TYPO3 13.x Tag gefunden"
+            echo "No TYPO3 v${MAJOR}.x tag found"
             echo "has_new_version=false" >> $GITHUB_OUTPUT
             exit 0
           fi
-          
+
           if [ "$NEW_TAG" = "$LAST_SYNCED" ]; then
-            echo "Keine neue Version verfügbar (aktuell: $LAST_SYNCED)"
+            echo "No new version available (current: $LAST_SYNCED)"
             echo "has_new_version=false" >> $GITHUB_OUTPUT
           else
-            echo "Neue Version gefunden: $NEW_TAG (alt: $LAST_SYNCED)"
+            echo "New version found: $NEW_TAG (previous: $LAST_SYNCED)"
             echo "has_new_version=true" >> $GITHUB_OUTPUT
             echo "typo3_version=$NEW_TAG" >> $GITHUB_OUTPUT
           fi
@@ -75,25 +91,25 @@ jobs:
       - name: Clone TYPO3 repository at specific tag
         run: |
           TYPO3_TAG="${{ needs.check-and-sync.outputs.typo3_version }}"
-          echo "Klone TYPO3 Repository bei Tag: $TYPO3_TAG"
-          
+          echo "Cloning TYPO3 repository at tag: $TYPO3_TAG"
+
           git clone --depth 1 --branch "$TYPO3_TAG" \
             https://github.com/TYPO3/typo3.git typo3-source
 
       - name: Extract TypeScript sources
         run: |
           mkdir -p typescript-split
-          
-          # Kopiere TypeScript Quellen
+
+          # Copy TypeScript sources
           if [ -d "typo3-source/Build/Sources/TypeScript" ]; then
             cp -r typo3-source/Build/Sources/TypeScript/* typescript-split/
-            echo "✓ TypeScript Quellen extrahiert"
+            echo "✓ TypeScript sources extracted"
           else
-            echo "✗ Fehler: Build/Sources/TypeScript nicht gefunden"
+            echo "✗ Error: Build/Sources/TypeScript not found"
             exit 1
           fi
-          
-          # Kopiere relevante Root-Dateien
+
+          # Copy relevant root files
           [ -f "typo3-source/LICENSE.txt" ] && cp typo3-source/LICENSE.txt typescript-split/
           [ -f "typo3-source/README.md" ] && cp typo3-source/README.md typescript-split/README-TYPO3.md
 
@@ -101,12 +117,13 @@ jobs:
         uses: actions/checkout@v4
         with:
           path: split-repo
+          ref: ${{ needs.check-and-sync.outputs.target_branch }}
           token: ${{ secrets.PAT_TOKEN }}
           fetch-depth: 0
 
       - name: Sync content to split repository
         run: |
-          # Lösche alte Inhalte (außer .git, .github, package.json)
+          # Delete old contents (except .git, .github, package.json)
           cd split-repo
           find . -mindepth 1 -maxdepth 1 \
             ! -name '.git' \
@@ -117,20 +134,20 @@ jobs:
             ! -name 'README.md' \
             ! -name 'node_modules' \
             -exec rm -rf {} +
-          
-          # Kopiere neue Inhalte
+
+          # Copy new contents
           cp -r ../typescript-split/* .
-          
-          # Speichere synced Tag
+
+          # Save synced tag
           echo "${{ needs.check-and-sync.outputs.typo3_version }}" > .last-synced-tag
 
       - name: Create/Update package.json
         working-directory: split-repo
         run: |
           TYPO3_VERSION="${{ needs.check-and-sync.outputs.typo3_version }}"
-          # Entferne 'v' Präfix für npm Version
+          # Remove 'v' prefix for npm version
           NPM_VERSION="${TYPO3_VERSION#v}"
-          
+
           cat > package.json << EOF
           {
             "name": "typo3-typescript-sources",
@@ -167,14 +184,14 @@ jobs:
             }
           }
           EOF
-          
-          echo "✓ package.json erstellt mit Version $NPM_VERSION"
+
+          echo "✓ package.json created with version $NPM_VERSION"
 
       - name: Create README
         working-directory: split-repo
         run: |
           TYPO3_VERSION="${{ needs.check-and-sync.outputs.typo3_version }}"
-          
+
           cat > README.md << 'EOF'
           # TYPO3 TypeScript Sources
 
@@ -196,6 +213,13 @@ jobs:
           - **Source Path:** `Build/Sources/TypeScript/`
           - **Current TYPO3 Version:** `TYPO3_VERSION_PLACEHOLDER`
 
+          ## 🌿 Branches
+
+          | Branch   | TYPO3 Version | npm tag   |
+          |----------|---------------|-----------|
+          | `main`   | v14.x         | `latest`  |
+          | `v13.x`  | v13.x         | `v13`     |
+
           ## 📝 License
 
           This package maintains the same license as TYPO3 Core: **GPL-2.0-or-later**
@@ -209,31 +233,32 @@ jobs:
           This is an unofficial split package maintained by [@maikschneider](https://github.com/maikschneider).
           For official TYPO3 packages, please refer to the [TYPO3 Core repository](https://github.com/TYPO3/typo3).
           EOF
-          
-          # Ersetze Platzhalter
+
+          # Replace placeholder
           sed -i "s/TYPO3_VERSION_PLACEHOLDER/${TYPO3_VERSION}/" README.md
 
       - name: Commit changes
         working-directory: split-repo
         run: |
+          TARGET_BRANCH="${{ needs.check-and-sync.outputs.target_branch }}"
           git add .
-          
+
           if git diff --staged --quiet; then
-            echo "Keine Änderungen zu committen"
+            echo "No changes to commit"
             exit 0
           fi
-          
+
           TYPO3_VERSION="${{ needs.check-and-sync.outputs.typo3_version }}"
           git commit -m "Sync with TYPO3 ${TYPO3_VERSION}
 
           Source: https://github.com/TYPO3/typo3/tree/${TYPO3_VERSION}
           Path: Build/Sources/TypeScript/"
-          
-          # Erstelle Tag (entferne v-Prefix falls vorhanden)
+
+          # Create tag (remove v-prefix)
           NPM_VERSION="${TYPO3_VERSION#v}"
           git tag -a "${NPM_VERSION}" -m "Release ${NPM_VERSION} from TYPO3 ${TYPO3_VERSION}"
-          
-          git push origin main
+
+          git push origin "${TARGET_BRANCH}"
           git push origin "${NPM_VERSION}"
 
       - name: Setup Node.js
@@ -245,11 +270,14 @@ jobs:
       - name: Publish to npm
         working-directory: split-repo
         run: |
-          # Stelle sicher, dass .npmrc korrekt konfiguriert ist
           echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}" > ~/.npmrc
-          
-          # Publish ohne OTP (Automation Token)
-          npm publish --access public
+
+          MAJOR="${{ needs.check-and-sync.outputs.major_version }}"
+          if [ "$MAJOR" = "13" ]; then
+            npm publish --access public --tag v13
+          else
+            npm publish --access public
+          fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
@@ -262,8 +290,24 @@ jobs:
           release_name: TYPO3 ${{ needs.check-and-sync.outputs.typo3_version }}
           body: |
             Synchronized with TYPO3 Core ${{ needs.check-and-sync.outputs.typo3_version }}
-            
+
             **Source:** https://github.com/TYPO3/typo3/tree/${{ needs.check-and-sync.outputs.typo3_version }}
             **Path:** `Build/Sources/TypeScript/`
           draft: false
           prerelease: false
+
+  trigger-v13-sync:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger sync for v13.x branch
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.PAT_TOKEN }}
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'sync-and-publish.yml',
+              ref: 'v13.x'
+            });
