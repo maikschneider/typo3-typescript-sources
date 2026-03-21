@@ -29,7 +29,7 @@ jobs:
         id: config
         run: |
           BRANCH="${{ github.ref_name }}"
-          if [[ "$BRANCH" == v13* ]]; then
+          if [[ "$BRANCH" == "v13.x" ]]; then
             echo "major_version=13" >> $GITHUB_OUTPUT
             echo "target_branch=v13.x" >> $GITHUB_OUTPUT
           else
@@ -57,6 +57,12 @@ jobs:
           # Manual tag input takes priority
           if [ -n "${{ github.event.inputs.tag }}" ]; then
             NEW_TAG="${{ github.event.inputs.tag }}"
+            # Validate that the manual tag matches the expected major version
+            if ! echo "$NEW_TAG" | grep -qE "^v${MAJOR}\."; then
+              echo "Error: Tag $NEW_TAG does not match expected major version v${MAJOR}.x for this branch"
+              echo "has_new_version=false" >> $GITHUB_OUTPUT
+              exit 0
+            fi
             echo "Manually specified tag: $NEW_TAG"
           else
             # Find newest tag that has not been synced yet
