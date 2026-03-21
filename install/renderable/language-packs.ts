@@ -11,9 +11,9 @@
  * The TYPO3 project - inspiring people to share!
  */
 
-import { customElement, property, state } from 'lit/decorators.js';
+import { customElement, property, state } from 'lit/decorators';
 import { LitElement, type TemplateResult, html, nothing } from 'lit';
-import { classMap } from 'lit/directives/class-map.js';
+import { classMap } from 'lit/directives/class-map';
 
 type Language = {
   iso: string,
@@ -163,7 +163,7 @@ export class LanguageMatrixElement extends LitElement {
             <div class="btn-group">
               ${this.renderLanguageActions(language)}
             </div>
-            <span class="ms-2">${language.name}</span>
+            ${language.name}
           </td>
           <td>${language.iso}</td>
           <td>${language.dependencies.join(', ')}</td>

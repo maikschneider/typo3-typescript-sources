@@ -11,10 +11,11 @@
  * The TYPO3 project - inspiring people to share!
  */
 
-import { customElement, property } from 'lit/decorators.js';
+import { customElement, property } from 'lit/decorators';
 import { html, LitElement, type TemplateResult } from 'lit';
 import { lll } from '@typo3/core/lit-helper';
 import '@typo3/backend/element/icon-element';
+import 'bootstrap'; // for data-bs-toggle="dropdown"
 
 type ThemeIdentifier = string;
 type Theme = {

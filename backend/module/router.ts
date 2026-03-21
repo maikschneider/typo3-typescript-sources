@@ -12,7 +12,7 @@
  */
 
 import { html, css, LitElement, type TemplateResult, type HasChanged } from 'lit';
-import { customElement, property, query } from 'lit/decorators.js';
+import { customElement, property, query } from 'lit/decorators';
 import { ModuleUtility, type ModuleState } from '@typo3/backend/module';
 
 const IFRAME_COMPONENT = '@typo3/backend/module/iframe';
@@ -50,7 +50,6 @@ export class ModuleRouter extends LitElement {
   @property({ type: String, attribute: 'state-tracker' }) stateTrackerUrl: string;
   @property({ type: String, attribute: 'sitename' }) sitename: string;
   @property({ type: String, attribute: 'entry-point' }) entryPoint: string;
-  @property({ type: String, attribute: 'install-tool-path' }) installToolPath: string;
   @query('slot', true) slotElement: HTMLSlotElement;
 
   // Not a @property, since changes must not cause a module-reload
@@ -239,28 +238,23 @@ export class ModuleRouter extends LitElement {
       this.updateBrowserTitle();
     }
 
-    if (!params.has('token')) {
+    if (params.has('token')) {
+      params.delete('token');
+      url.search = params.toString();
+    } else if (params.has('install[controller]')) {
       // InstallTool doesn't use a backend-route with a token,
       // but has backend-routes that act as wrappers.
       // Rewrite the URL for display in the browser URL bar.
       // @todo: rewrite installtool as webcomponent backend
       // module in order to advertise a proper module URL on it's own
-      if (params.has('install[controller]')) {
-        const controller = params.get('install[controller]');
-        params.delete('install[controller]');
-        params.delete('install[context]');
-        params.delete('install[colorScheme]');
-        params.delete('install[theme]');
-        url.pathname = url.pathname.replace(this.installToolPath, this.entryPoint + 'module/tools/' + controller);
-      } else {
-        // non token-urls cannot be mapped by
-        // the main backend controller right now
-        return;
-      }
+      const controller = params.get('install[controller]');
+      url.pathname = this.entryPoint + 'module/system/' + controller;
+      url.search = '';
+    } else {
+      // non token-urls cannot be mapped by
+      // the main backend controller right now
+      return;
     }
-
-    params.delete('token');
-    url.search = params.toString();
 
     const niceUrl = url.toString();
     window.history.replaceState(state, '', niceUrl);

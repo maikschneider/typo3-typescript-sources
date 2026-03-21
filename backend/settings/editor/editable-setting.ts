@@ -12,7 +12,7 @@
  */
 
 import { html, LitElement, type TemplateResult, nothing } from 'lit';
-import { customElement, property, state } from 'lit/decorators.js';
+import { customElement, property, state } from 'lit/decorators';
 import { until } from 'lit/directives/until.js';
 import '@typo3/backend/element/icon-element';
 import { copyToClipboard } from '@typo3/backend/copy-to-clipboard';
@@ -22,6 +22,7 @@ import { markdown } from '@typo3/core/directive/markdown';
 import AjaxRequest from '@typo3/core/ajax/ajax-request';
 import type { BaseElement } from '@typo3/backend/settings/type/base';
 import { SettingsMode, sanitizeSettingsMode } from '@typo3/backend/settings/enum/settings-mode.enum';
+import 'bootstrap'; // for data-bs-toggle="dropdown"
 
 type ValueType = string|number|boolean|string[]|null;
 

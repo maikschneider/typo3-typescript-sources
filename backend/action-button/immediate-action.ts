@@ -17,6 +17,8 @@ import { AbstractAction } from './abstract-action';
  * Action used when an operation is executed immediately.
  */
 class ImmediateAction extends AbstractAction {
+  protected override callback: () => void;
+
   public execute(): Promise<void> {
     return this.executeCallback();
   }

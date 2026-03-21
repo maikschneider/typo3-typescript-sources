@@ -59,6 +59,7 @@ type PreviewActionCallback = (targetName: string, previewUrl: string, $actionEle
 type NewActionCallback = (targetName: string, $actionElement: JQuery) => void;
 type DuplicateActionCallback = (targetName: string, $actionElement: JQuery) => void;
 type DeleteActionCallback = (targetName: string, $actionElement: JQuery) => void;
+export type FormEngineFieldElement = HTMLInputElement|HTMLTextAreaElement|HTMLSelectElement;
 
 /**
  * Module: @typo3/backend/form-engine
@@ -81,7 +82,7 @@ export default (function() {
     const humanReadableField = document.querySelector(selector`[data-formengine-input-name="${data.elementName}"]`);
     FormEngine.Validation.updateInputField(data.elementName);
     if (valueField !== null) {
-      FormEngine.Validation.markFieldAsChanged(valueField as HTMLInputElement);
+      FormEngine.markFieldAsChanged(valueField as HTMLInputElement);
       FormEngine.Validation.validateField(valueField as HTMLInputElement);
     }
     if (humanReadableField !== null && humanReadableField !== valueField) {
@@ -142,6 +143,9 @@ export default (function() {
     elementRef.dispatchEvent(new Event('change', { bubbles: true, cancelable: true }));
   });
 
+  let formEngineIsReady: boolean = false;
+  let formEngineReadyPromise: Promise<void> = null;
+
   /**
    * @exports @typo3/backend/form-engine
    */
@@ -165,6 +169,18 @@ export default (function() {
       configurable: false,
     }
   );
+
+  FormEngine.ready = async function(): Promise<void> {
+    const createReadyPromise = async function(): Promise<void> {
+      if (formEngineIsReady) {
+        return;
+      }
+
+      await new Promise<void>(resolve => FormEngine.formElement.addEventListener('typo3:form-engine:ready', () => resolve(), { once: true }));
+    };
+
+    return formEngineReadyPromise ?? (formEngineReadyPromise = createReadyPromise());
+  };
 
   /**
    * Opens a popup window with the element browser (browser.php)
@@ -315,7 +331,7 @@ export default (function() {
         // set the hidden field
         FormEngine.updateHiddenFieldValueFromSelect(fieldEl, originalFieldEl);
 
-        FormEngine.Validation.markFieldAsChanged(originalFieldEl);
+        FormEngine.markFieldAsChanged(originalFieldEl);
         FormEngine.Validation.validateField(fieldEl);
         FormEngine.Validation.validateField(availableFieldEl);
       }
@@ -353,38 +369,6 @@ export default (function() {
     originalFieldEl.value = selectedValues.join(',');
     originalFieldEl.dispatchEvent(new Event('change', { bubbles: true, cancelable: true }));
   };
-
-  /**
-   * returns a jQuery object for the given form name of the current form,
-   * if the parameter "fieldName" is given, then the form element is only returned if the field name is available
-   * the latter behaviour mirrors the one of the function "setFormValue_getFObj"
-   *
-   * @param {String} fieldName the field name to check for, optional
-   * @returns {*|HTMLElement}
-   */
-  FormEngine.getFormElement = function(fieldName: string): JQuery|HTMLElement|void {
-    const $formEl = $(selector`form[name="${FormEngine.formName}"]:first`);
-    if (fieldName) {
-      const $fieldEl = FormEngine.getFieldElement(fieldName)
-        , $listFieldEl = FormEngine.getFieldElement(fieldName, '_list');
-
-      // Take the form object if it is either of type select-one or of type-multiple and it has a "_list" element
-      if ($fieldEl.length > 0 &&
-        (
-          ($fieldEl.prop('type') === 'select-one') ||
-          ($listFieldEl.length > 0 && $listFieldEl.prop('type').match(/select-(one|multiple)/))
-        )
-      ) {
-        return $formEl;
-      } else {
-        console.error('Form fields missing: form: ' + FormEngine.formName + ', field name: ' + fieldName);
-        alert('Form field is invalid');
-      }
-    } else {
-      return $formEl;
-    }
-  };
-
 
   /**
    * Returns a jQuery object of the field DOM element of the current form, can also be used to
@@ -464,7 +448,7 @@ export default (function() {
 
     new RegularEvent('change', (event: Event, target: HTMLInputElement): void => {
       FormEngine.toggleCheckboxField(target);
-      FormEngine.Validation.markFieldAsChanged(target);
+      FormEngine.markFieldAsChanged(target);
     }).delegateTo(document, '.t3js-form-field-eval-null-placeholder-checkbox input[type="checkbox"]');
 
     new RegularEvent('click', (e: Event, target: HTMLElement): void => {
@@ -766,6 +750,17 @@ export default (function() {
   };
 
   /**
+   * Helper function to mark a field as changed.
+   */
+  FormEngine.markFieldAsChanged = function (field: FormEngineFieldElement): void {
+    field.classList.add('has-change');
+    const fieldLabel = field.closest('.t3js-formengine-palette-field')?.querySelector('.t3js-formengine-label');
+    if (fieldLabel !== null) {
+      fieldLabel.classList.add('has-change');
+    }
+  };
+
+  /**
    * @param {boolean} response
    */
   FormEngine.preventExitIfNotSavedCallback = (): void => {
@@ -796,16 +791,16 @@ export default (function() {
     callback = callback || FormEngine.preventExitIfNotSavedCallback;
 
     if (FormEngine.hasChange() || FormEngine.isNew()) {
-      const title = TYPO3.lang['label.confirm.close_without_save.title'] || 'Do you want to close without saving?';
-      const content = TYPO3.lang['label.confirm.close_without_save.content'] || 'You currently have unsaved changes. Are you sure you want to discard these changes?';
+      const title = TYPO3.lang['label.confirm.close_without_save.title'] || 'Unsaved changes';
+      const content = TYPO3.lang['label.confirm.close_without_save.content'] || 'You currently have unsaved changes which will be discarded if you close without saving.';
       const buttons: Array<{text: string, btnClass: string, name: string, active?: boolean}> = [
         {
-          text: TYPO3.lang['buttons.confirm.close_without_save.no'] || 'No, I will continue editing',
+          text: TYPO3.lang['buttons.confirm.close_without_save.no'] || 'Keep editing',
           btnClass: 'btn-default',
           name: 'no'
         },
         {
-          text: TYPO3.lang['buttons.confirm.close_without_save.yes'] || 'Yes, discard my changes',
+          text: TYPO3.lang['buttons.confirm.close_without_save.yes'] || 'Discard changes',
           btnClass: 'btn-default',
           name: 'yes'
         }
@@ -895,7 +890,7 @@ export default (function() {
    * to prevent operations (e.g. save) on slow connections before the page is actually reloaded.
    */
   FormEngine.disableDocHeaderButtons = function(): void {
-    const docHeaderBar = document.querySelector('.t3js-module-docheader-bar-buttons');
+    const docHeaderBar = document.querySelector('.t3js-module-docheader-buttons');
     if (!docHeaderBar) {
       return;
     }
@@ -917,7 +912,7 @@ export default (function() {
    * Called after FormEngine initialization is complete to restore button interactivity.
    */
   FormEngine.enableDocHeaderButtons = function(): void {
-    const docHeaderBar = document.querySelector('.t3js-module-docheader-bar-buttons');
+    const docHeaderBar = document.querySelector('.t3js-module-docheader-buttons');
     if (!docHeaderBar) {
       return;
     }
@@ -1355,7 +1350,7 @@ export default (function() {
    */
   FormEngine.initialize = function(browserUrl: string, doSaveFieldName: string): void {
     FormEngine.browserUrl = browserUrl;
-    // Add doSaveFieldName - fall back to to `doSave` for b/w compatibility
+    // Add doSaveFieldName - fall back to do `doSave` for b/w compatibility
     FormEngine.doSaveFieldName = doSaveFieldName || 'doSave';
 
     DocumentService.ready().then((): void => {
@@ -1364,6 +1359,9 @@ export default (function() {
       FormEngine.reinitialize();
       $('#t3js-ui-block').remove();
       FormEngine.enableDocHeaderButtons();
+
+      FormEngine.formElement.dispatchEvent(new Event('typo3:form-engine:ready'));
+      formEngineIsReady = true;
 
       Hotkeys.setScope('backend/form-engine');
       Hotkeys.register([Hotkeys.normalizedCtrlModifierKey, 's'], (e: KeyboardEvent): void => {

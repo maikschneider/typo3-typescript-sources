@@ -16,7 +16,7 @@
 
 import { LitElement, type PropertyDeclaration, type ReactiveElement } from 'lit';
 import { defaultConverter } from '@lit/reactive-element';
-import { property } from 'lit/decorators.js';
+import { property } from 'lit/decorators';
 
 export const internals = Symbol('internals');
 const privateInternals = Symbol('privateInternals');

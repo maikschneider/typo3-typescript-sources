@@ -11,7 +11,7 @@
  * The TYPO3 project - inspiring people to share!
  */
 
-import { customElement, property } from 'lit/decorators.js';
+import { customElement, property } from 'lit/decorators';
 import { html, css, LitElement, type CSSResult, type TemplateResult, nothing } from 'lit';
 import Modal from '@typo3/backend/modal';
 import '@typo3/backend/element/icon-element';
@@ -22,6 +22,9 @@ import Notification from '@typo3/backend/notification';
 import Viewport from '@typo3/backend/viewport';
 import RegularEvent from '@typo3/core/event/regular-event';
 import { KeyTypesEnum } from '@typo3/backend/enum/key-types';
+import { RecordUsageStore } from '@typo3/backend/record-usage/record-usage-store';
+import ClientStorage from '@typo3/backend/storage/client';
+import PersistentStorage from '@typo3/backend/storage/persistent';
 
 type RequestType = 'location' | 'ajax' | 'event' | undefined;
 
@@ -80,6 +83,8 @@ export class Category {
     public readonly identifier: string,
     public readonly label: string,
     public readonly items: Item[],
+    public readonly icon?: string,
+    public readonly featured?: boolean,
   ) {
   }
 
@@ -153,6 +158,8 @@ interface Message {
   message: string;
   severity: string;
 }
+
+const LAST_USED_CATEGORY_IDENTIFIER = 'wizard-last-category/';
 
 /**
  * Module: @typo3/backend/new-record-wizard
@@ -231,7 +238,8 @@ export class NewRecordWizard extends LitElement {
         .navigation-list {
           z-index: 1;
           position: absolute;
-          padding: var(--typo3-component-border-width);
+          top: calc(100% + 2px);
+          padding: 2px;
           background: var(--typo3-component-bg);
           border: var(--typo3-component-border-width) solid var(--typo3-component-border-color);
           border-radius: var(--typo3-component-border-radius);
@@ -259,8 +267,14 @@ export class NewRecordWizard extends LitElement {
         padding: var(--typo3-list-item-padding-y) var(--typo3-list-item-padding-x);
       }
 
+      .navigation-item-featured:has(+ .navigation-item:not(.navigation-item-featured)) {
+        margin-bottom: calc(var(--typo3-spacing) / 2);
+      }
+
       @container (max-width: 499px) {
         .navigation-item {
+          --typo3-component-border-color: transparent;
+          margin-bottom: 0 !important;
           border-radius: calc(var(--typo3-component-border-radius) - var(--typo3-component-border-width));
         }
       }
@@ -399,7 +413,10 @@ export class NewRecordWizard extends LitElement {
   @property({ type: String, attribute: false }) searchTerm: string = '';
   @property({ type: Array, attribute: false }) messages: Message[] = [];
   @property({ type: Boolean, attribute: false }) toggleMenu: boolean = false;
+  @property({ type: String }) storeName: string | null = null;
   @property({ type: Boolean, reflect: true, attribute: 'has-navigation' }) hasNavigation = false;
+
+  private recordUsageStore: RecordUsageStore;
 
   protected override firstUpdated(): void {
     // Load shared css file
@@ -413,7 +430,53 @@ export class NewRecordWizard extends LitElement {
       filterField.focus();
     }
 
+    const displayRecentlyUsed = PersistentStorage.isset('displayRecentlyUsed')
+      ? Boolean(JSON.parse(PersistentStorage.get('displayRecentlyUsed')))
+      : true;
+
+    if (this.storeName) {
+      this.recordUsageStore = new RecordUsageStore(this.storeName);
+      if (displayRecentlyUsed) {
+        this.addRecentlyUsedCategory();
+      }
+    }
     this.selectAvailableCategory();
+  }
+
+  protected addRecentlyUsedCategory(): void {
+    const usageData = this.recordUsageStore.getUsage();
+    if (Object.keys(usageData).length === 0) {
+      return;
+    }
+
+    const recentlyUsedItems: Item[] = this.categories.items.flatMap(
+      category => category.items.filter(
+        item => item.identifier in usageData
+      )
+    ).sort(
+      (a, b) => {
+        const usageA = usageData[a.identifier];
+        const usageB = usageData[b.identifier];
+        // Sort by count (descending)
+        if (usageB.count !== usageA.count) {
+          return usageB.count - usageA.count;
+        }
+        // Sort by lastUsed (descending)
+        return usageB.lastUsed - usageA.lastUsed;
+      }
+    ).slice(0, 10);
+
+    if (recentlyUsedItems.length > 0) {
+      const recentlyUsedCategory = new Category(
+        'recently-used',
+        this.getLanguageLabel('newRecordWizard.recentlyUsed'),
+        recentlyUsedItems,
+        'actions-history',
+        true
+      );
+
+      this.categories.items.unshift(recentlyUsedCategory);
+    }
   }
 
   protected getLanguageLabel(label: string): string {
@@ -426,11 +489,22 @@ export class NewRecordWizard extends LitElement {
   }
 
   protected selectAvailableCategory(): void {
+    let savedCategoryIdentifier: string | null = null;
+
+    if (this.storeName) {
+      savedCategoryIdentifier = ClientStorage.get(this.getCategoryLocalStorageKey());
+    }
 
     const needsCategoryChange: boolean = this.categories.categoriesWithItems()
       .filter((item: Category): boolean => item === this.selectedCategory).length === 0;
     if (needsCategoryChange) {
-      this.selectedCategory = this.categories.categoriesWithItems()[0] ?? null;
+      if (savedCategoryIdentifier) {
+        this.selectedCategory = this.categories.categoriesWithItems().find(
+          (category: Category): boolean => category.identifier === savedCategoryIdentifier
+        ) ?? this.categories.categoriesWithItems()[0] ?? null;
+      } else {
+        this.selectedCategory = this.categories.categoriesWithItems()[0] ?? null;
+      }
     }
 
     this.messages = [];
@@ -517,9 +591,10 @@ export class NewRecordWizard extends LitElement {
   protected renderNavigationToggle(): TemplateResult {
     return html`
         <button
-          class="navigation-toggle btn btn-light"
+          class="navigation-toggle btn btn-default"
           @click="${() => { this.toggleMenu = !this.toggleMenu; }}"
         >
+          ${ this.selectedCategory.icon ? html`<typo3-backend-icon identifier="${this.selectedCategory.icon}" size="small"></typo3-backend-icon>` : nothing }
           ${this.selectedCategory.label}
           <typo3-backend-icon identifier="actions-chevron-${(this.toggleMenu === true) ? 'up' : 'down'}" size="small"></typo3-backend-icon>
         </button>
@@ -533,7 +608,7 @@ export class NewRecordWizard extends LitElement {
     return html`
         <button
           data-identifier="${category.identifier}"
-          class="navigation-item${(this.selectedCategory === category) ? ' active' : ''}"
+          class="navigation-item${(category.featured) ? ' navigation-item-featured' : ''}${(this.selectedCategory === category) ? ' active' : ''}"
           ?disabled="${category.disabled}"
           @click="${() => { this.handleNavigationClick(category); }}"
           @keydown="${(event: KeyboardEvent) => { this.handleNavigationKeydown(event, category); }}"
@@ -541,10 +616,11 @@ export class NewRecordWizard extends LitElement {
           aria-selected="${(this.selectedCategory === category) ? 'true' : 'false'}"
           tabindex="${(this.selectedCategory === category) ? '0' : '-1'}"
         >
+          ${category.icon ? html`<span class="navigation-item-icon"><typo3-backend-icon identifier="${category.icon}" size="small"></typo3-backend-icon></div>` : nothing}
           <span class="navigation-item-label">${category.label}</span>
           <span class="navigation-item-count">${category.activeItems().length}</span>
         </button>
-      `;
+    `;
   })}
       </div>`;
   }
@@ -552,6 +628,10 @@ export class NewRecordWizard extends LitElement {
   protected handleNavigationClick(category: Category): void {
     this.selectedCategory = category;
     this.toggleMenu = false;
+
+    if (this.storeName) {
+      ClientStorage.set(this.getCategoryLocalStorageKey(), category.identifier);
+    }
   }
 
   protected handleNavigationKeydown(event: KeyboardEvent, category: Category): void {
@@ -587,8 +667,13 @@ export class NewRecordWizard extends LitElement {
   protected renderCategory(category: Category): TemplateResult {
     return html`${(this.selectedCategory === category || this.displayMenu === false) && !category.disabled ?
       html`
-        <div class="elementwizard-category">
-          ${this.displayMenu === false ? html`<div class="elementwizard-category-headline">${category.label}</div>` : nothing}
+        <div class="elementwizard-category" role="${this.displayMenu ? 'tabpanel' : nothing}">
+          ${this.displayMenu === false ?
+    html`<div class="elementwizard-category-headline">
+      ${ category.icon ? html`<typo3-backend-icon identifier="${category.icon}" size="small"></typo3-backend-icon>` : nothing }
+      ${category.label}
+    </div>`
+    : nothing}
           <div class="elementwizard-category-items">
             ${category.items.map((item: Item) => this.renderCategoryItem(item))}
           </div>
@@ -620,6 +705,10 @@ export class NewRecordWizard extends LitElement {
   }
 
   protected handleItemClick(item: Item): void {
+    if (this.storeName) {
+      this.recordUsageStore.track(item.identifier);
+    }
+
     if (item.requestType === 'event') {
       const event = new CustomEvent(item.event, {
         detail: {
@@ -636,7 +725,7 @@ export class NewRecordWizard extends LitElement {
     }
 
     if (item.requestType === 'location') {
-      Viewport.ContentContainer.setUrl(item.url);
+      Viewport.ContentContainer.setUrl(item.url.replace(/_CURRENT_MODULE_/g, top.TYPO3.ModuleMenu.App.getCurrentModule()));
       Modal.dismiss();
       return;
     }
@@ -666,6 +755,10 @@ export class NewRecordWizard extends LitElement {
         Notification.error('Could not load module data');
       });
     }
+  }
+
+  protected getCategoryLocalStorageKey(): string {
+    return LAST_USED_CATEGORY_IDENTIFIER + this.storeName;
   }
 }
 

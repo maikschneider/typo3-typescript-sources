@@ -11,10 +11,9 @@
  * The TYPO3 project - inspiring people to share!
  */
 
-import { customElement, property } from 'lit/decorators.js';
+import { customElement, property } from 'lit/decorators';
 import { PseudoButtonLitElement } from '@typo3/backend/element/pseudo-button';
 import { SeverityEnum } from '@typo3/backend/enum/severity';
-import Severity from '@typo3/backend/severity';
 import Modal from '@typo3/backend/modal';
 import { lll } from '@typo3/core/lit-helper';
 
@@ -64,7 +63,7 @@ export class RecordDownloadButton extends PseudoButtonLitElement {
         },
         {
           text: this.ok || lll('button.ok') || 'Download',
-          btnClass: 'btn-' + Severity.getCssClass(SeverityEnum.info),
+          btnClass: 'btn-primary',
           name: 'download',
           trigger: (): void => {
             const form: HTMLFormElement = modal.querySelector('form');

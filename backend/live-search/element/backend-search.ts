@@ -11,7 +11,7 @@
  * The TYPO3 project - inspiring people to share!
  */
 
-import { customElement } from 'lit/decorators.js';
+import { customElement } from 'lit/decorators';
 import { LitElement } from 'lit';
 
 /**

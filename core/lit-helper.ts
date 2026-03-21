@@ -12,8 +12,8 @@
  */
 
 import { type CSSResultArray, html, type HTMLTemplateResult, render, nothing, type TemplateResult } from 'lit';
-import type { ClassInfo } from 'lit/directives/class-map.js';
-import { until } from 'lit/directives/until.js';
+import type { ClassInfo } from 'lit/directives/class-map';
+import { until } from 'lit/directives/until';
 
 interface LitNonceWindow extends Window {
   litNonce?: string;

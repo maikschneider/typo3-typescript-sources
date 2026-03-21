@@ -12,10 +12,10 @@
  */
 
 import { html, LitElement, nothing, type TemplateResult } from 'lit';
-import { customElement, property } from 'lit/decorators.js';
-import { until } from 'lit/directives/until.js';
-import { unsafeHTML } from 'lit/directives/unsafe-html.js';
-import { classMap } from 'lit/directives/class-map.js';
+import { customElement, property } from 'lit/decorators';
+import { until } from 'lit/directives/until';
+import { unsafeHTML } from 'lit/directives/unsafe-html';
+import { classMap } from 'lit/directives/class-map';
 import AjaxRequest from '@typo3/core/ajax/ajax-request';
 import type { AjaxResponse } from '@typo3/core/ajax/ajax-response';
 import Notification from '@typo3/backend/notification';
@@ -134,7 +134,7 @@ export class ClipboardPanel extends LitElement {
               ${tab.title}
               ${tab.info}` : html`
               <typo3-backend-icon identifier="actions-circle" size="small"></typo3-backend-icon>
-              <span class="text-body-secondary">
+              <span class="text-variant">
                 ${tab.title}
                 ${tab.info}
               </span>

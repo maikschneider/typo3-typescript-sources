@@ -1856,8 +1856,7 @@ export class DataBackend {
     runningAjaxRequests.renderFormDefinitionPage = $.post(this.endpoints.formPageRenderer, {
       formDefinition: JSON.stringify(utility.convertToSimpleObject(getApplicationStateStack().getCurrentState('formDefinition'))),
       pageIndex: pageIndex,
-      prototypeName: this.prototypeName,
-      formPersistenceIdentifier: this.persistenceIdentifier
+      prototypeName: this.prototypeName
     }, (data: string, textStatus, jqXHR): void => {
       if (runningAjaxRequests.renderFormDefinitionPage !== jqXHR) {
         return;

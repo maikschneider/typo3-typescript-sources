@@ -12,7 +12,7 @@
  */
 
 import { css, html, LitElement, nothing, type TemplateResult } from 'lit';
-import { customElement, property } from 'lit/decorators.js';
+import { customElement, property } from 'lit/decorators';
 
 /**
  * Module @typo3/extensionmanager/distribution-image

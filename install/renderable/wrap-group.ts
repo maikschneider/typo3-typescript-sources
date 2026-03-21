@@ -1,5 +1,5 @@
 import { LitElement, type TemplateResult, html } from 'lit';
-import { customElement, property } from 'lit/decorators.js';
+import { customElement, property } from 'lit/decorators';
 
 @customElement('typo3-install-wrap-group')
 class WrapGroupElement extends LitElement {

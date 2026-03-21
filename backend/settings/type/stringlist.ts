@@ -12,7 +12,7 @@
  */
 
 import { html, type TemplateResult } from 'lit';
-import { customElement, property } from 'lit/decorators.js';
+import { customElement, property } from 'lit/decorators';
 import { BaseElement } from './base';
 import { live } from 'lit/directives/live.js';
 

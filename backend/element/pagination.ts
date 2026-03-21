@@ -11,11 +11,11 @@
  * The TYPO3 project - inspiring people to share!
  */
 
-import { customElement, property } from 'lit/decorators.js';
+import { customElement, property } from 'lit/decorators';
 import { html, LitElement, type TemplateResult } from 'lit';
-import { range } from 'lit/directives/range.js';
-import { map } from 'lit/directives/map.js';
-import { classMap } from 'lit/directives/class-map.js';
+import { range } from 'lit/directives/range';
+import { map } from 'lit/directives/map';
+import { classMap } from 'lit/directives/class-map';
 
 @customElement('typo3-backend-pagination')
 export class PaginationElement extends LitElement {

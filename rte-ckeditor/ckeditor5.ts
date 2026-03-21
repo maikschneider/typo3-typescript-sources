@@ -1,5 +1,5 @@
 import { html, LitElement, type TemplateResult } from 'lit';
-import { customElement, property, queryAssignedElements } from 'lit/decorators.js';
+import { customElement, property, queryAssignedElements } from 'lit/decorators';
 import AjaxRequest from '@typo3/core/ajax/ajax-request';
 import DebounceEvent from '@typo3/core/event/debounce-event';
 import { prefixAndRebaseCss } from '@typo3/rte-ckeditor/css-prefixer';
@@ -360,7 +360,7 @@ type PseudoRegExp = {
 };
 
 function walkObj(data: RecurseMapInput, proc: (value: unknown) => unknown|null): RecurseMapInput {
-  if (data !== null && typeof data === 'object') {
+  if (typeof data === 'object') {
     if (Array.isArray(data)) {
       return data.map((element: RecurseMapInput) => proc(element) ?? walkObj(element, proc));
     }
@@ -375,7 +375,7 @@ function walkObj(data: RecurseMapInput, proc: (value: unknown) => unknown|null):
 
 function convertPseudoRegExp(data: RecurseMapInput): RecurseMapInput {
   return walkObj(data, (entry: PseudoRegExp | unknown): RegExp | null => {
-    if (entry !== null && typeof entry === 'object' && 'pattern' in entry && typeof entry.pattern === 'string') {
+    if (typeof entry === 'object' && 'pattern' in entry && typeof entry.pattern === 'string') {
       const pseudoRegExp = entry as PseudoRegExp;
       return new RegExp(pseudoRegExp.pattern, pseudoRegExp.flags || undefined);
     }

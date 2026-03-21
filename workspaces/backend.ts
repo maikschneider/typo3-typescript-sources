@@ -153,7 +153,7 @@ class Backend extends Workspaces {
    */
   private checkIntegrity(payload: object): Promise<AjaxResponse> {
     return this.sendRemoteRequest(
-      this.generateRemotePayload('checkIntegrity', payload),
+      this.generateRemotePayloadBody('checkIntegrity', payload),
     );
   }
 
@@ -198,6 +198,7 @@ class Backend extends Workspaces {
       const row = target.closest('tr') as HTMLTableRowElement;
       const newUrl = TYPO3.settings.FormEngine.moduleUrl
         + '&returnUrl=' + encodeURIComponent(document.location.href)
+        + '&module=' + encodeURIComponent(top.TYPO3.ModuleMenu.App.getCurrentModule())
         + '&id=' + TYPO3.settings.Workspaces.id + '&edit[' + row.dataset.table + '][' + row.dataset.uid + ']=edit';
 
       window.location.href = newUrl;
@@ -246,10 +247,6 @@ class Backend extends Workspaces {
 
     new RegularEvent('submit', (event: Event) => {
       event.preventDefault();
-
-      const searchTextField = document.querySelector(Identifiers.searchTextField) as HTMLInputElement;
-
-      this.settings.filterTxt = searchTextField.value;
       this.getWorkspaceInfos();
     }).delegateTo(document, Identifiers.searchForm);
 
@@ -257,9 +254,17 @@ class Backend extends Workspaces {
       const searchSubmitButton = document.querySelector(Identifiers.searchSubmitBtn) as HTMLButtonElement;
 
       if (target.value !== '') {
-        searchSubmitButton.classList.remove('disabled');
+        searchSubmitButton.disabled = false;
       } else {
-        searchSubmitButton.classList.add('disabled');
+        searchSubmitButton.disabled = true;
+        this.settings.filterTxt = '';
+        this.getWorkspaceInfos();
+      }
+    }).delegateTo(document, Identifiers.searchTextField);
+
+    new RegularEvent('change', (event: Event, target: HTMLInputElement) => {
+      this.settings.filterTxt = target.value;
+      if (this.settings.filterTxt !== '') {
         this.getWorkspaceInfos();
       }
     }).delegateTo(document, Identifiers.searchTextField);
@@ -270,7 +275,7 @@ class Backend extends Workspaces {
         {
           onClear: (): void => {
             const searchSubmitButton = document.querySelector(Identifiers.searchSubmitBtn) as HTMLButtonElement;
-            searchSubmitButton.classList.add('disabled');
+            searchSubmitButton.disabled = true;
             this.settings.filterTxt = '';
             this.getWorkspaceInfos();
           },
@@ -284,7 +289,7 @@ class Backend extends Workspaces {
     // Listen for depth changes
     new RegularEvent('change', (event: Event, target: HTMLSelectElement) => {
       const depth = target.value;
-      Persistent.set('moduleData.workspaces_admin.depth', depth);
+      Persistent.set('moduleData.workspaces_publish.depth', depth);
       this.settings.depth = depth;
       this.getWorkspaceInfos();
     }).delegateTo(document, Identifiers.depthSelector);
@@ -294,10 +299,10 @@ class Backend extends Workspaces {
 
     // Listen for language changes
     new RegularEvent('change', (event: Event, target: HTMLSelectElement) => {
-      Persistent.set('moduleData.workspaces_admin.language', target.value);
+      Persistent.set('moduleData.workspaces_publish.language', target.value);
       this.settings.language = target.value;
       this.sendRemoteRequest(
-        this.generateRemotePayload('getWorkspaceInfos', this.settings),
+        this.generateRemotePayloadBody('getWorkspaceInfos', this.settings),
       ).then(async (response: AjaxResponse): Promise<void> => {
         const actionResponse = await response.resolve();
         target.previousElementSibling.innerHTML = (target.querySelector('option:checked') as HTMLElement).dataset.icon;
@@ -307,7 +312,7 @@ class Backend extends Workspaces {
 
     new RegularEvent('change', (event: Event, target: HTMLSelectElement) => {
       const stage = target.value;
-      Persistent.set('moduleData.workspaces_admin.stage', stage);
+      Persistent.set('moduleData.workspaces_publish.stage', stage);
       this.settings.stage = stage;
       this.getWorkspaceInfos();
     }).delegateTo(document, Identifiers.stagesSelector);
@@ -408,7 +413,7 @@ class Backend extends Workspaces {
     }
 
     this.sendRemoteRequest(
-      this.generateRemoteActionsPayload(stageWindowAction, [
+      this.generateRemotePayloadBody(stageWindowAction, [
         row.dataset.uid, row.dataset.table, row.dataset.t3ver_oid,
       ]),
     ).then(async (response: AjaxResponse): Promise<void> => {
@@ -424,10 +429,9 @@ class Backend extends Workspaces {
             uid: row.dataset.uid,
             elements: [],
           };
-
           this.sendRemoteRequest([
-            this.generateRemoteActionsPayload(stageExecuteAction, [serializedForm]),
-            this.generateRemotePayload('getWorkspaceInfos', this.settings),
+            this.generateRemotePayloadBody(stageExecuteAction, [serializedForm]),
+            this.generateRemotePayloadBody('getWorkspaceInfos', this.settings),
           ]).then(async (response: AjaxResponse): Promise<void> => {
             const requestResponse = await response.resolve();
             modal.hideModal();
@@ -444,7 +448,7 @@ class Backend extends Workspaces {
    */
   private getWorkspaceInfos(): void {
     this.sendRemoteRequest(
-      this.generateRemotePayload('getWorkspaceInfos', this.settings),
+      this.generateRemotePayloadBody('getWorkspaceInfos', this.settings),
     ).then(async (response: AjaxResponse): Promise<void> => {
       this.renderWorkspaceInfos((await response.resolve())[0].result);
     });
@@ -510,7 +514,7 @@ class Backend extends Workspaces {
 
     const tableRow = target.closest('tr') as HTMLTableRowElement;
     this.sendRemoteRequest(
-      this.generateRemotePayload('getRowDetails', {
+      this.generateRemotePayloadBody('getRowDetails', {
         stage: parseInt(tableRow.dataset.stage, 10),
         t3ver_oid: parseInt(tableRow.dataset.t3ver_oid, 10),
         table: tableRow.dataset.table,
@@ -576,7 +580,7 @@ class Backend extends Workspaces {
     const tableRow = target.closest('tr') as HTMLTableRowElement;
 
     this.sendRemoteRequest(
-      this.generateRemoteActionsPayload('viewSingleRecord', [
+      this.generateRemotePayloadBody('viewSingleRecord', [
         tableRow.dataset.table, tableRow.dataset.uid,
       ]),
     ).then(async (response: AjaxResponse): Promise<void> => {
@@ -616,7 +620,7 @@ class Backend extends Workspaces {
     modal.addEventListener('button.clicked', (modalEvent: Event): void => {
       if ((<HTMLAnchorElement>modalEvent.target).name === 'ok') {
         this.sendRemoteRequest([
-          this.generateRemoteActionsPayload('deleteSingleRecord', [
+          this.generateRemotePayloadBody('discardSingleRecord', [
             tableRow.dataset.table,
             tableRow.dataset.uid,
           ]),
@@ -700,7 +704,7 @@ class Backend extends Workspaces {
           btnClass: 'btn-info',
           action: new DeferredAction(async (): Promise<void> => {
             await this.sendRemoteRequest(
-              this.generateRemoteActionsPayload('publishSingleRecord', [
+              this.generateRemotePayloadBody('publishSingleRecord', [
                 row.dataset.table,
                 row.dataset.t3ver_oid,
                 row.dataset.uid,
@@ -732,7 +736,7 @@ class Backend extends Workspaces {
           btnClass: 'btn-warning',
           action: new DeferredAction(async (): Promise<void> => {
             await this.sendRemoteRequest(
-              this.generateRemoteActionsPayload('executeSelectionAction', {
+              this.generateRemotePayloadBody('executeSelectionAction', {
                 action: selectedAction,
                 selection: affectedRecords,
               }),
@@ -790,11 +794,11 @@ class Backend extends Workspaces {
 
     switch (selectedAction) {
       case 'publish':
-        massAction = 'publishWorkspace';
+        massAction = 'publishEntireWorkspace';
         continueButtonLabel = TYPO3.lang.label_doaction_publish;
         break;
       case 'discard':
-        massAction = 'flushWorkspace';
+        massAction = 'discardEntireWorkspace';
         continueButtonLabel = TYPO3.lang.label_doaction_discard;
         break;
       default:
@@ -806,7 +810,7 @@ class Backend extends Workspaces {
       // Make sure to process all items
       if (result.processed < result.total) {
         this.sendRemoteRequest(
-          this.generateRemoteMassActionsPayload(massAction, result),
+          this.generateRemotePayloadBody(massAction, result),
         ).then(sendRequestsUntilAllProcessed);
       } else {
         this.getWorkspaceInfos();
@@ -834,7 +838,7 @@ class Backend extends Workspaces {
           btnClass: 'btn-warning',
           action: new DeferredAction(async (): Promise<void> => {
             const response = await this.sendRemoteRequest(
-              this.generateRemoteMassActionsPayload(massAction, {
+              this.generateRemotePayloadBody(massAction, {
                 init: true,
                 total: 0,
                 processed: 0,
@@ -869,7 +873,7 @@ class Backend extends Workspaces {
       });
     }
     this.sendRemoteRequest(
-      this.generateRemoteActionsPayload('sendToSpecificStageWindow', [stage]),
+      this.generateRemotePayloadBody('sendToSpecificStageWindow', [stage]),
     ).then(async (response: AjaxResponse): Promise<void> => {
       const modal = this.renderSendToStageWindow(await response.resolve());
       modal.addEventListener('button.clicked', (modalEvent: Event): void => {
@@ -880,10 +884,9 @@ class Backend extends Workspaces {
             elements: affectedRecords,
             nextStage: stage,
           };
-
           this.sendRemoteRequest([
-            this.generateRemoteActionsPayload('sendToSpecificStageExecute', [serializedForm]),
-            this.generateRemotePayload('getWorkspaceInfos', this.settings),
+            this.generateRemotePayloadBody('sendToSpecificStageExecute', [serializedForm]),
+            this.generateRemotePayloadBody('getWorkspaceInfos', this.settings),
           ]).then(async (response: AjaxResponse): Promise<void> => {
             const actionResponse = await response.resolve();
             modal.hideModal();
@@ -906,7 +909,7 @@ class Backend extends Workspaces {
    */
   private generatePreviewLinks(): void {
     this.sendRemoteRequest(
-      this.generateRemoteActionsPayload('generateWorkspacePreviewLinksForAllLanguages', [
+      this.generateRemotePayloadBody('generateWorkspacePreviewLinksForAllLanguages', [
         this.settings.id,
       ]),
     ).then(async (response: AjaxResponse): Promise<void> => {

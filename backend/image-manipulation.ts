@@ -12,12 +12,12 @@
  */
 
 import { html, type TemplateResult } from 'lit';
-import { unsafeHTML } from 'lit/directives/unsafe-html.js';
-import { styleMap } from 'lit/directives/style-map.js';
+import { unsafeHTML } from 'lit/directives/unsafe-html';
+import { styleMap } from 'lit/directives/style-map';
 import type { AjaxResponse } from '@typo3/core/ajax/ajax-response';
 import AjaxRequest from '@typo3/core/ajax/ajax-request';
 import RegularEvent from '@typo3/core/event/regular-event';
-import FormEngineValidation from '@typo3/backend/form-engine-validation';
+import FormEngine from '@typo3/backend/form-engine';
 import Cropper from 'cropperjs';
 import { default as Modal, type ModalElement } from './modal';
 import '@typo3/backend/element/spinner-element';
@@ -835,7 +835,7 @@ class ImageManipulation {
     this.trigger.dataset.cropVariants = JSON.stringify(data);
     this.setPreviewImages(data);
     hiddenField.value = cropVariants;
-    FormEngineValidation.markFieldAsChanged(hiddenField);
+    FormEngine.markFieldAsChanged(hiddenField);
     this.currentModal.hideModal();
   }
 

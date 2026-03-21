@@ -12,8 +12,8 @@
  */
 
 import { html, LitElement, type TemplateResult, nothing } from 'lit';
-import { customElement, property, query } from 'lit/decorators.js';
-import { until } from 'lit/directives/until.js';
+import { customElement, property, query } from 'lit/decorators';
+import { until } from 'lit/directives/until';
 import { lll } from '@typo3/core/lit-helper';
 import AjaxRequest from '@typo3/core/ajax/ajax-request';
 import Persistent from '@typo3/backend/storage/persistent';
@@ -25,11 +25,13 @@ import { TreeToolbar } from '@typo3/backend/tree/tree-toolbar';
 import { TreeModuleState } from '@typo3/backend/tree/tree-module-state';
 import Modal from '../modal';
 import Severity from '../severity';
+import { UrlFactory } from '@typo3/core/factory/url-factory';
 import { ModuleStateStorage } from '@typo3/backend/storage/module-state-storage';
 import { DataTransferTypes } from '@typo3/backend/enum/data-transfer-types';
 import type { AjaxResponse } from '@typo3/core/ajax/ajax-response';
 import type { DragTooltipMetadata } from '@typo3/backend/drag-tooltip';
 import type { DataTransferStringItem } from '@typo3/backend/tree/tree';
+import 'bootstrap'; // for data-bs-toggle="dropdown"
 
 /**
  * This module defines the Custom Element for rendering the navigation component for an editable page tree
@@ -405,7 +407,7 @@ export class PageTreeNavigationComponent extends TreeModuleState(LitElement) {
       <div class="node-mount-point">
         <div class="node-mount-point__icon"><typo3-backend-icon identifier="actions-info-circle" size="small"></typo3-backend-icon></div>
         <div class="node-mount-point__text">${this.mountPointPath}</div>
-        <div class="node-mount-point__icon mountpoint-close" @click="${() => this.unsetTemporaryMountPoint()}" title="${lll('labels.temporaryDBmount')}">
+        <div class="node-mount-point__icon mountpoint-close" @click="${() => this.unsetTemporaryMountPoint()}" title="${lll('labels.temporaryPageTreeEntryPoints')}">
           <typo3-backend-icon identifier="actions-close" size="small"></typo3-backend-icon>
         </div>
       </div>
@@ -447,9 +449,10 @@ export class PageTreeNavigationComponent extends TreeModuleState(LitElement) {
 
     // Load the currently selected module with the updated URL
     const moduleMenu = top.TYPO3.ModuleMenu.App;
-    let contentUrl = ModuleUtility.getFromName(moduleMenu.getCurrentModule()).link;
-    contentUrl += contentUrl.includes('?') ? '&' : '?';
-    top.TYPO3.Backend.ContentContainer.setUrl(contentUrl + 'id=' + node.identifier);
+    const contentUrl = UrlFactory.createUrl(ModuleUtility.getFromName(moduleMenu.getCurrentModule()).link, {
+      id: node.identifier
+    });
+    top.TYPO3.Backend.ContentContainer.setUrl(contentUrl);
   };
 
   private readonly showContextMenu = (evt: CustomEvent): void => {
@@ -483,7 +486,7 @@ class PageTreeToolbar extends TreeToolbar {
               <label for="toolbarSearch" class="visually-hidden">
                 ${lll('labels.label.searchString')}
               </label>
-              <input type="search" id="toolbarSearch" class="form-control form-control-sm search-input" placeholder="${lll('tree.searchTermInfo')}">
+              <input type="search" id="toolbarSearch" class="form-control form-control-sm search-input" placeholder="${lll('tree.searchPageTree')}">
           </div>
         </div>
         <div class="tree-toolbar__submenu">
@@ -507,7 +510,7 @@ class PageTreeToolbar extends TreeToolbar {
       }
           <button
             type="button"
-            class="tree-toolbar__menuitem dropdown-toggle dropdown-toggle-no-chevron float-end"
+            class="btn btn-sm btn-icon btn-default btn-borderless"
             data-bs-toggle="dropdown"
             aria-expanded="false"
             aria-label="${lll('labels.openPageTreeOptionsMenu')}"

@@ -18,6 +18,10 @@ import DocumentService from '@typo3/core/document-service';
 import { MultiRecordSelectionSelectors } from '@typo3/backend/multi-record-selection';
 import { selector } from '@typo3/core/literals';
 import type { ActionConfiguration, ActionEventDetails } from '@typo3/backend/multi-record-selection-action';
+import Notification from '@typo3/backend/notification';
+import AjaxRequest from '@typo3/core/ajax/ajax-request';
+import { AjaxResponse } from '@typo3/core/ajax/ajax-response';
+import { sudoModeInterceptor } from '@typo3/backend/security/sudo-mode-interceptor';
 
 interface IconIdentifier {
   collapse: string;
@@ -27,6 +31,8 @@ interface RecordlistIdentifier {
   entity: string;
   toggle: string;
   localize: string;
+  hide: string;
+  delete: string;
   editMultiple: string;
   icons: IconIdentifier;
 }
@@ -46,6 +52,8 @@ class Recordlist {
     entity: '.t3js-entity',
     toggle: '.t3js-toggle-recordlist',
     localize: '.t3js-action-localize',
+    hide: 'button[data-datahandler-action="visibility"]',
+    delete: '.t3js-record-delete',
     editMultiple: '.t3js-record-edit-multiple',
     icons: {
       collapse: 'actions-view-list-collapse',
@@ -57,6 +65,7 @@ class Recordlist {
     new RegularEvent('click', this.toggleClick).delegateTo(document, this.identifier.toggle);
     new RegularEvent('click', this.onEditMultiple).delegateTo(document, this.identifier.editMultiple);
     new RegularEvent('click', this.disableButton).delegateTo(document, this.identifier.localize);
+    new RegularEvent('click', this.toggleVisibility).delegateTo(document, this.identifier.hide);
     DocumentService.ready().then((): void => {
       this.registerPaginationEvents();
     });
@@ -188,6 +197,7 @@ class Recordlist {
 
     let editUrl: string = top.TYPO3.settings.FormEngine.moduleUrl
       + '&edit[' + tableName + '][' + entityIdentifiers.join(',') + ']=edit'
+      + '&module=' + encodeURIComponent(top.TYPO3.ModuleMenu.App.getCurrentModule())
       + '&returnUrl=' + Recordlist.getReturnUrl(returnUrl);
 
     if (columnsOnly.length > 0) {
@@ -200,6 +210,66 @@ class Recordlist {
   private readonly disableButton = (event: Event, target: HTMLElement): void => {
     target.setAttribute('disabled', 'disabled');
     target.classList.add('disabled');
+  };
+
+  private readonly toggleVisibility = (event: Event, target: HTMLButtonElement): void => {
+    target.disabled = true;
+
+    const buttonIconElement = target.querySelector('.t3js-icon');
+    const originalIconElement = buttonIconElement.cloneNode(true);
+
+    Icons.getIcon('spinner-circle', Icons.sizes.small).then((icon: string): void => {
+      buttonIconElement.replaceWith(document.createRange().createContextualFragment(icon));
+    });
+
+    const rowElement = target.closest('tr[data-uid]') as HTMLTableRowElement;
+    const table = rowElement.dataset.table;
+    const uid = parseInt(rowElement.dataset.uid, 10);
+    const isVisible = target.dataset.datahandlerStatus === 'visible';
+    const targetAction = isVisible ? 'hide' : 'show';
+
+    new AjaxRequest(TYPO3.settings.ajaxUrls.record_toggle_visibility).addMiddleware(sudoModeInterceptor).post({
+      table: table,
+      uid: uid,
+      action: targetAction,
+    }).then(async (response: AjaxResponse): Promise<void> => {
+      const data = await response.resolve();
+      target.setAttribute('data-datahandler-status', data.isVisible ? 'visible' : 'hidden');
+
+      const elementLabel = data.isVisible
+        ? target.dataset.datahandlerVisibleLabel
+        : target.dataset.datahandlerHiddenLabel;
+      target.setAttribute('title', elementLabel);
+      const buttonIconIdentifier = data.isVisible ? 'actions-edit-hide' : 'actions-edit-unhide';
+      Icons.getIcon(buttonIconIdentifier, Icons.sizes.small).then((icon: string): void => {
+        const buttonIconElement = target.querySelector('.t3js-icon');
+        buttonIconElement.replaceWith(document.createRange().createContextualFragment(icon));
+      });
+
+      const recordIconElement = rowElement.querySelector('.col-icon .t3js-icon');
+      recordIconElement.replaceWith(document.createRange().createContextualFragment(data.icon));
+
+      // Animate row
+      const animationEvent = new RegularEvent('animationend', (): void => {
+        rowElement.classList.remove('record-pulse');
+        animationEvent.release();
+      });
+      animationEvent.bindTo(rowElement);
+      rowElement.classList.add('record-pulse');
+
+      if (table === 'pages') {
+        top.document.dispatchEvent(new CustomEvent('typo3:pagetree:refresh'));
+      }
+    }).catch(async(response: AjaxResponse): Promise<void> => {
+      target.querySelector('.t3js-icon').replaceWith(originalIconElement);
+
+      const data = await response.resolve();
+      for (const message of data.messages) {
+        Notification.error(message.title, message.message);
+      }
+    }).finally((): void => {
+      target.disabled = false;
+    });
   };
 
   private readonly registerPaginationEvents = (): void => {

@@ -11,7 +11,7 @@
  * The TYPO3 project - inspiring people to share!
  */
 
-import { customElement, property, query } from 'lit/decorators.js';
+import { customElement, property, query } from 'lit/decorators';
 import { css, html, LitElement, type TemplateResult } from 'lit';
 import Alwan from 'alwan';
 import RegularEvent from '@typo3/core/event/regular-event';
@@ -38,6 +38,7 @@ export class Typo3BackendColorPicker extends LitElement {
       height: var(--typo3-colorpicker-preview-height);
       top: 50%;
       inset-inline-start: var(--typo3-input-sm-padding-x);
+      z-index: 1;
       transform: translate(0, -50%);
       background: var(--typo3-bg-checkerboard-background-color);
       background-image: linear-gradient(45deg, var(--typo3-bg-checkerboard-background-image-color) 25%, transparent 25%), linear-gradient(135deg, var(--typo3-bg-checkerboard-background-image-color) 25%, transparent 25%), linear-gradient(45deg, transparent 75%, var(--typo3-bg-checkerboard-background-image-color) 75%), linear-gradient(135deg, transparent 75%, var(--typo3-bg-checkerboard-background-image-color) 75%);
@@ -58,7 +59,7 @@ export class Typo3BackendColorPicker extends LitElement {
 
   @property({ type: String }) color: string = '';
   @property({ type: Boolean }) opacity: boolean = false;
-  @property({ type: Array }) swatches: {label: string, color: string}[] = [];
+  @property({ type: String }) swatches: string = '';
 
   // Use a reference to the input slot element
   @query('slot') slotEl!: HTMLSlotElement;
@@ -82,7 +83,7 @@ export class Typo3BackendColorPicker extends LitElement {
         position: 'bottom-start',
         format: 'hex',
         opacity: this.opacity,
-        swatches: this.swatches,
+        swatches: this.swatches ? this.swatches.split(';') : [],
         preset: false,
         color: this.color,
       });
@@ -140,7 +141,7 @@ class LegacyColorPicker {
     }
 
     const colorPicker = document.createElement('typo3-backend-color-picker');
-    colorPicker.swatches = options.swatches.map((swatch: string) => ({ color: swatch, label: swatch }));
+    colorPicker.swatches = options.swatches?.join(';') ?? '';
     colorPicker.opacity = options.opacity ?? false;
     element.parentNode.insertBefore(colorPicker, element);
     colorPicker.appendChild(element);

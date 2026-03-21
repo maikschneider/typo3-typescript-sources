@@ -12,10 +12,10 @@
  */
 
 import { html, LitElement, type TemplateResult, type PropertyValues, nothing } from 'lit';
-import { property, state, query } from 'lit/decorators.js';
-import { repeat } from 'lit/directives/repeat.js';
-import { styleMap } from 'lit/directives/style-map.js';
-import { ifDefined } from 'lit/directives/if-defined.js';
+import { property, state, query } from 'lit/decorators';
+import { repeat } from 'lit/directives/repeat';
+import { styleMap } from 'lit/directives/style-map';
+import { ifDefined } from 'lit/directives/if-defined';
 import { TreeNodeCommandEnum, TreeNodePositionEnum, type TreeNodeInterface, type TreeNodeStatusInformation, type TreeNodeLabel } from './tree-node';
 import AjaxRequest from '@typo3/core/ajax/ajax-request';
 import Notification from '../notification';
@@ -1593,7 +1593,7 @@ export class Tree extends LitElement {
       );
     } catch {
       console.error('Failed to check the existence of window.frameElement – using a foreign origin?');
-      // Do nothing if an error occured during the event registration
+      // Do nothing if an error occurred during the event registration
     }
   }
 }

@@ -12,7 +12,7 @@
  */
 
 import { html, css, LitElement, type TemplateResult, nothing } from 'lit';
-import { customElement, property, state } from 'lit/decorators.js';
+import { customElement, property, state } from 'lit/decorators';
 import '@typo3/backend/element/icon-element';
 import AjaxDataHandler from '../ajax-data-handler';
 
@@ -24,7 +24,7 @@ export class EditablePageTitle extends LitElement {
       --input-border-color: #bebebe;
       --input-hover-border-color: #bebebe;
       --input-focus-border-color: #bebebe;
-      --button-border-radius: 2px;
+      --button-border-radius: var(--typo3-input-border-radius);
       --button-color: inherit;
       --button-bg: transparent;
       --button-border-color: transparent;
@@ -34,6 +34,8 @@ export class EditablePageTitle extends LitElement {
       --button-focus-color: inherit;
       --button-focus-bg: #cacaca;
       --button-focus-border-color: #bebebe;
+      --button-padding-x: var(--typo3-input-padding-x);
+      --button-padding-y: var(--typo3-input-padding-y);
     }
 
     h1 {
@@ -97,8 +99,7 @@ export class EditablePageTitle extends LitElement {
       justify-content: center;
       font-size: inherit;
       line-height: inherit;
-      border: 0;
-      padding: 0;
+      padding: var(--button-padding-y) var(--button-padding-x);
       height: 100%;
       width: 1em;
       position: absolute;
@@ -109,7 +110,7 @@ export class EditablePageTitle extends LitElement {
       color: var(--button-color);
       background: var(--button-bg);
       border: 1px solid var(--button-border-color);
-      opacity: .8;
+      opacity: .3;
       outline-offset: 0;
       transition: all .2s ease-in-out;
     }

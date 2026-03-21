@@ -28,6 +28,7 @@ import DomHelper from '@typo3/backend/utility/dom-helper';
 import { KeyTypesEnum } from '@typo3/backend/enum/key-types';
 import '@typo3/backend/element/progress-bar-element';
 import type { ProgressBarElement } from '@typo3/backend/element/progress-bar-element';
+import { FormatUtility } from '@typo3/backend/utility/format-utility';
 
 /**
  * Possible actions for conflicts w/ existing files
@@ -37,6 +38,11 @@ enum Action {
   RENAME = 'rename',
   SKIP = 'cancel',
   USE_EXISTING = 'useExisting',
+}
+
+enum Mode {
+  MANAGE = 'manage',
+  BROWSE = 'browse',
 }
 
 /**
@@ -80,7 +86,7 @@ export default class DragUploader {
   public filesExtensionsDisallowed: string;
   public fileDenyPattern: RegExp | null;
   public maxFileSize: number;
-  public trigger: HTMLElement;
+  public trigger: HTMLElement | null;
   public target: string;
   public reloadUrl: string;
   public manualTable: boolean;
@@ -111,13 +117,13 @@ export default class DragUploader {
   constructor(element: HTMLElement) {
     this.body = document.querySelector('body');
     this.element = element;
-    const hasTrigger = this.element.dataset.dropzoneTrigger !== undefined;
     this.trigger = document.querySelector(this.element.dataset.dropzoneTrigger);
     this.defaultAction = this.element.dataset.defaultAction as Action || Action.SKIP;
     this.dropzone = document.createElement('div');
     this.dropzone.classList.add('dropzone');
     this.dropzone.setAttribute('hidden', 'hidden');
     this.irreObjectUid = this.element.dataset.fileIrreObject;
+    this.manualTable = this.element.hasAttribute('data-manual-table');
 
     const dropZoneEscapedTarget = document.querySelector(this.element.dataset.dropzoneTarget);
     if (this.irreObjectUid && DomHelper.nextAll(dropZoneEscapedTarget).length !== 0) {
@@ -229,7 +235,7 @@ export default class DragUploader {
       }
     });
 
-    this.bindUploadButton(hasTrigger === true ? this.trigger : this.element);
+    this.bindUploadButton(this.trigger !== null ? this.trigger : this.element);
   }
 
   public static init(): void {
@@ -258,18 +264,6 @@ export default class DragUploader {
         new DragUploader(element);
       });
     });
-  }
-
-  public static fileSizeAsString(size: number): string {
-    const sizeKB: number = size / 1024;
-    let str = '';
-
-    if (sizeKB > 1024) {
-      str = (sizeKB / 1024).toFixed(1) + ' MB';
-    } else {
-      str = sizeKB.toFixed(1) + ' KB';
-    }
-    return str;
   }
 
   /**
@@ -390,7 +384,7 @@ export default class DragUploader {
           });
           NProgress.inc(this.percentagePerFile);
         } else {
-          new FileQueueItem(this, file, Action.SKIP);
+          new FileQueueItem(this, file, Action.SKIP, this.fileList.dataset.mode === Mode.BROWSE ? Mode.BROWSE : Mode.MANAGE);
         }
       });
       ajaxCalls.push(request);
@@ -500,11 +494,11 @@ export default class DragUploader {
     : this.askForOverride[i].original.icon}
           </td>
           <td>
-            ${this.askForOverride[i].original.name} (${DragUploader.fileSizeAsString(this.askForOverride[i].original.size)})<br />
+            ${this.askForOverride[i].original.name} (${FormatUtility.fileSizeAsString(this.askForOverride[i].original.size)})<br />
             ${DateTime.fromSeconds(this.askForOverride[i].original.mtime).toLocaleString(DateTime.DATETIME_MED)}
           </td>
           <td>
-            ${this.askForOverride[i].uploaded.name} (${DragUploader.fileSizeAsString(this.askForOverride[i].uploaded.size)})<br />
+            ${this.askForOverride[i].uploaded.name} (${FormatUtility.fileSizeAsString(this.askForOverride[i].uploaded.size)})<br />
             ${DateTime.fromMillis(this.askForOverride[i].uploaded.lastModified).toLocaleString(DateTime.DATETIME_MED)}
           </td>
           <td>
@@ -596,7 +590,7 @@ export default class DragUploader {
               fileInfo.original,
             );
           } else if (fileInfo.action !== Action.SKIP) {
-            new FileQueueItem(this, fileInfo.uploaded, fileInfo.action);
+            new FileQueueItem(this, fileInfo.uploaded, fileInfo.action, this.fileList.dataset.mode === Mode.BROWSE ? Mode.BROWSE : Mode.MANAGE);
           }
         }
         this.askForOverride = [];
@@ -612,6 +606,7 @@ export default class DragUploader {
 
 class FileQueueItem {
   private readonly row: HTMLElement;
+  private readonly mode: Mode;
   private readonly progress: HTMLElement;
   private readonly file: File;
   private readonly override: Action;
@@ -621,10 +616,11 @@ class FileQueueItem {
   private readonly progressBar: ProgressBarElement;
   private readonly dragUploader: DragUploader;
 
-  constructor(dragUploader: DragUploader, file: File, override: Action) {
+  constructor(dragUploader: DragUploader, file: File, override: Action, mode: Mode) {
     this.dragUploader = dragUploader;
     this.file = file;
     this.override = override;
+    this.mode = mode;
 
     this.row = document.createElement('tr');
     this.row.classList.add('upload-queue-item');
@@ -676,7 +672,7 @@ class FileQueueItem {
     if (this.dragUploader.maxFileSize > 0 && this.file.size > this.dragUploader.maxFileSize) {
       this.updateMessage(TYPO3.lang['file_upload.maxFileSizeExceeded']
         .replace(/\{0\}/g, this.file.name)
-        .replace(/\{1\}/g, DragUploader.fileSizeAsString(this.dragUploader.maxFileSize)));
+        .replace(/\{1\}/g, FormatUtility.fileSizeAsString(this.dragUploader.maxFileSize)));
       this.progressBar.value = 100;
       this.progressBar.severity = SeverityEnum.error;
 
@@ -695,7 +691,7 @@ class FileQueueItem {
       this.progressBar.value = 100;
       this.progressBar.severity = SeverityEnum.error;
     } else {
-      this.updateMessage('- ' + DragUploader.fileSizeAsString(this.file.size));
+      this.updateMessage('- ' + FormatUtility.fileSizeAsString(this.file.size));
 
       const formData = new FormData();
       formData.append('data[upload][1][target]', this.dragUploader.target);
@@ -865,24 +861,26 @@ class FileQueueItem {
     this.row.append(fileExtColumn);
 
     const fileSizeColumn = document.createElement('td');
-    fileSizeColumn.textContent = DragUploader.fileSizeAsString(fileInfo.size);
+    fileSizeColumn.textContent = FormatUtility.fileSizeAsString(fileInfo.size);
     this.row.append(fileSizeColumn);
 
-    let permissions = '';
-    if (fileInfo.permissions.read) {
-      permissions += '<strong class="text-danger">' + TYPO3.lang['permissions.read'] + '</strong>';
-    }
-    if (fileInfo.permissions.write) {
-      permissions += '<strong class="text-danger">' + TYPO3.lang['permissions.write'] + '</strong>';
-    }
+    if (this.mode === Mode.MANAGE) {
+      let permissions = '';
+      if (fileInfo.permissions.read) {
+        permissions += '<strong class="text-danger">' + TYPO3.lang['permissions.read'] + '</strong>';
+      }
+      if (fileInfo.permissions.write) {
+        permissions += '<strong class="text-danger">' + TYPO3.lang['permissions.write'] + '</strong>';
+      }
 
-    const permissionsColumn = document.createElement('td');
-    permissionsColumn.innerHTML = permissions;
-    this.row.append(permissionsColumn);
+      const permissionsColumn = document.createElement('td');
+      permissionsColumn.innerHTML = permissions;
+      this.row.append(permissionsColumn);
 
-    const emptyColumn = document.createElement('td');
-    emptyColumn.textContent = '-';
-    this.row.append(emptyColumn);
+      const emptyColumn = document.createElement('td');
+      emptyColumn.textContent = '-';
+      this.row.append(emptyColumn);
+    }
 
     // add spacing cells when more columns are displayed (column selector)
     for (let i = this.row.querySelectorAll('td').length; i < this.dragUploader.fileListColumnCount; i++) {

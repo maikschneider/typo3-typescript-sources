@@ -62,11 +62,19 @@ class ContextMenuActions {
   }
 
   public static replaceFile(table: string, uid: string, dataset: DOMStringMap): void {
-    const resource = FileListActionUtility.createResourceFromContextDataset(dataset);
-    const actionUrl: string = dataset.actionUrl;
-    top.TYPO3.Backend.ContentContainer.setUrl(
-      actionUrl + '&target=' + encodeURIComponent(resource.identifier) + '&uid=' + encodeURIComponent(resource.uid) + '&returnUrl=' + ContextMenuActions.getReturnUrl(),
-    );
+    (async () => {
+      await import('@typo3/filelist/file-list-replace-handler');
+      const resource = FileListActionUtility.createResourceFromContextDataset(dataset);
+      const detail: FileListActionDetail = {
+        event: null,
+        trigger: null,
+        action: FileListActionEvent.rename,
+        resources: [resource],
+        url: null,
+        originalAction: null
+      };
+      document.dispatchEvent(new CustomEvent(FileListActionEvent.replace, { detail: detail }));
+    })();
   }
 
   public static editFile(table: string, uid: string, dataset: DOMStringMap): void {
@@ -84,6 +92,7 @@ class ContextMenuActions {
     top.TYPO3.Backend.ContentContainer.setUrl(
       top.TYPO3.settings.FormEngine.moduleUrl
       + '&edit[sys_file_metadata][' + resource.metaUid + ']=edit'
+      + '&module=' + encodeURIComponent(top.TYPO3.ModuleMenu.App.getCurrentModule())
       + '&returnUrl=' + ContextMenuActions.getReturnUrl()
     );
   }
@@ -97,13 +106,6 @@ class ContextMenuActions {
     }
   }
 
-  public static uploadFile(table: string, uid: string, dataset: DOMStringMap): void {
-    const actionUrl: string = dataset.actionUrl;
-    top.TYPO3.Backend.ContentContainer.setUrl(
-      actionUrl + '&target=' + encodeURIComponent(uid) + '&returnUrl=' + ContextMenuActions.getReturnUrl(),
-    );
-  }
-
   public static createFolder(table: string, uid: string, dataset: DOMStringMap): void {
     top.TYPO3.Backend.ContentContainer.get().document.dispatchEvent(new CustomEvent(fileListOpenElementBrowser, {
       detail: {
@@ -115,10 +117,13 @@ class ContextMenuActions {
   }
 
   public static createFile(table: string, uid: string, dataset: DOMStringMap): void {
-    const actionUrl: string = dataset.actionUrl;
-    top.TYPO3.Backend.ContentContainer.setUrl(
-      actionUrl + '&target=' + encodeURIComponent(uid) + '&returnUrl=' + ContextMenuActions.getReturnUrl(),
-    );
+    top.TYPO3.Backend.ContentContainer.get().document.dispatchEvent(new CustomEvent(fileListOpenElementBrowser, {
+      detail: {
+        actionUrl: dataset.actionUrl,
+        identifier: dataset.identifier,
+        mode: dataset.mode,
+      }
+    }));
   }
 
   public static downloadFile(table: string, uid: string, dataset: DOMStringMap): void {
