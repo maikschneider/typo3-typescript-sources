@@ -15,35 +15,40 @@ permissions:
   contents: read
 
 jobs:
-  check-and-sync:
+  setup:
     runs-on: ubuntu-latest
     outputs:
-      has_new_version: ${{ steps.check.outputs.has_new_version }}
-      typo3_version: ${{ steps.check.outputs.typo3_version }}
-      target_branch: ${{ steps.config.outputs.target_branch }}
-      major_version: ${{ steps.config.outputs.major_version }}
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Build version matrix
+        id: set-matrix
+        run: |
+          if [[ "${{ github.event_name }}" == "schedule" ]]; then
+            # Schedule runs daily for both major versions
+            echo 'matrix={"include":[{"major_version":"14","target_branch":"main"},{"major_version":"13","target_branch":"v13.x"}]}' >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref_name }}" == "v13.x" ]]; then
+            echo 'matrix={"include":[{"major_version":"13","target_branch":"v13.x"}]}' >> $GITHUB_OUTPUT
+          else
+            echo 'matrix={"include":[{"major_version":"14","target_branch":"main"}]}' >> $GITHUB_OUTPUT
+          fi
+
+  check-and-sync:
+    needs: setup
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.setup.outputs.matrix) }}
     steps:
       - name: Checkout split repository
         uses: actions/checkout@v4
         with:
+          ref: ${{ matrix.target_branch }}
           fetch-depth: 0
-
-      - name: Determine TYPO3 major version from branch
-        id: config
-        run: |
-          BRANCH="${{ github.ref_name }}"
-          if [[ "$BRANCH" == "v13.x" ]]; then
-            echo "major_version=13" >> $GITHUB_OUTPUT
-            echo "target_branch=v13.x" >> $GITHUB_OUTPUT
-          else
-            echo "major_version=14" >> $GITHUB_OUTPUT
-            echo "target_branch=main" >> $GITHUB_OUTPUT
-          fi
 
       - name: Check for new TYPO3 tags
         id: check
         run: |
-          MAJOR="${{ steps.config.outputs.major_version }}"
+          MAJOR="${{ matrix.major_version }}"
 
           # Fetch all tags from TYPO3 repository for the target major version
           git ls-remote --tags https://github.com/TYPO3/typo3.git | \
@@ -87,25 +92,23 @@ jobs:
             echo "typo3_version=$NEW_TAG" >> $GITHUB_OUTPUT
           fi
 
-  sync-and-publish:
-    needs: check-and-sync
-    if: needs.check-and-sync.outputs.has_new_version == 'true'
-    runs-on: ubuntu-latest
-    steps:
       - name: Setup Git
+        if: steps.check.outputs.has_new_version == 'true'
         run: |
           git config --global user.name "TYPO3 TypeScript Sync Bot"
           git config --global user.email "bot@maikschneider.de"
 
       - name: Clone TYPO3 repository at specific tag
+        if: steps.check.outputs.has_new_version == 'true'
         run: |
-          TYPO3_TAG="${{ needs.check-and-sync.outputs.typo3_version }}"
+          TYPO3_TAG="${{ steps.check.outputs.typo3_version }}"
           echo "Cloning TYPO3 repository at tag: $TYPO3_TAG"
 
           git clone --depth 1 --branch "$TYPO3_TAG" \
             https://github.com/TYPO3/typo3.git typo3-source
 
       - name: Extract TypeScript sources
+        if: steps.check.outputs.has_new_version == 'true'
         run: |
           mkdir -p typescript-split
 
@@ -122,15 +125,17 @@ jobs:
           [ -f "typo3-source/LICENSE.txt" ] && cp typo3-source/LICENSE.txt typescript-split/
           [ -f "typo3-source/README.md" ] && cp typo3-source/README.md typescript-split/README-TYPO3.md
 
-      - name: Checkout split repository
+      - name: Checkout split repository for sync
+        if: steps.check.outputs.has_new_version == 'true'
         uses: actions/checkout@v4
         with:
           path: split-repo
-          ref: ${{ needs.check-and-sync.outputs.target_branch }}
+          ref: ${{ matrix.target_branch }}
           token: ${{ secrets.PAT_TOKEN }}
           fetch-depth: 0
 
       - name: Sync content to split repository
+        if: steps.check.outputs.has_new_version == 'true'
         run: |
           # Delete old contents (except .git, .github, package.json)
           cd split-repo
@@ -148,12 +153,13 @@ jobs:
           cp -r ../typescript-split/* .
 
           # Save synced tag
-          echo "${{ needs.check-and-sync.outputs.typo3_version }}" > .last-synced-tag
+          echo "${{ steps.check.outputs.typo3_version }}" > .last-synced-tag
 
       - name: Create/Update package.json
+        if: steps.check.outputs.has_new_version == 'true'
         working-directory: split-repo
         run: |
-          TYPO3_VERSION="${{ needs.check-and-sync.outputs.typo3_version }}"
+          TYPO3_VERSION="${{ steps.check.outputs.typo3_version }}"
           # Remove 'v' prefix for npm version
           NPM_VERSION="${TYPO3_VERSION#v}"
 
@@ -197,9 +203,10 @@ jobs:
           echo "✓ package.json created with version $NPM_VERSION"
 
       - name: Create README
+        if: steps.check.outputs.has_new_version == 'true'
         working-directory: split-repo
         run: |
-          TYPO3_VERSION="${{ needs.check-and-sync.outputs.typo3_version }}"
+          TYPO3_VERSION="${{ steps.check.outputs.typo3_version }}"
 
           cat > README.md << 'EOF'
           # TYPO3 TypeScript Sources
@@ -247,9 +254,10 @@ jobs:
           sed -i "s/TYPO3_VERSION_PLACEHOLDER/${TYPO3_VERSION}/" README.md
 
       - name: Commit changes
+        if: steps.check.outputs.has_new_version == 'true'
         working-directory: split-repo
         run: |
-          TARGET_BRANCH="${{ needs.check-and-sync.outputs.target_branch }}"
+          TARGET_BRANCH="${{ matrix.target_branch }}"
           git add .
 
           if git diff --staged --quiet; then
@@ -257,7 +265,7 @@ jobs:
             exit 0
           fi
 
-          TYPO3_VERSION="${{ needs.check-and-sync.outputs.typo3_version }}"
+          TYPO3_VERSION="${{ steps.check.outputs.typo3_version }}"
           git commit -m "Sync with TYPO3 ${TYPO3_VERSION}
 
           Source: https://github.com/TYPO3/typo3/tree/${TYPO3_VERSION}
@@ -271,17 +279,19 @@ jobs:
           git push origin "${NPM_VERSION}"
 
       - name: Setup Node.js
+        if: steps.check.outputs.has_new_version == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
 
       - name: Publish to npm
+        if: steps.check.outputs.has_new_version == 'true'
         working-directory: split-repo
         run: |
           echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}" > ~/.npmrc
 
-          MAJOR="${{ needs.check-and-sync.outputs.major_version }}"
+          MAJOR="${{ matrix.major_version }}"
           if [ "$MAJOR" = "13" ]; then
             npm publish --access public --tag v13
           else
@@ -291,32 +301,17 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Create GitHub Release
+        if: steps.check.outputs.has_new_version == 'true'
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
         with:
-          tag_name: ${{ needs.check-and-sync.outputs.typo3_version }}
-          release_name: TYPO3 ${{ needs.check-and-sync.outputs.typo3_version }}
+          tag_name: ${{ steps.check.outputs.typo3_version }}
+          release_name: TYPO3 ${{ steps.check.outputs.typo3_version }}
           body: |
-            Synchronized with TYPO3 Core ${{ needs.check-and-sync.outputs.typo3_version }}
+            Synchronized with TYPO3 Core ${{ steps.check.outputs.typo3_version }}
 
-            **Source:** https://github.com/TYPO3/typo3/tree/${{ needs.check-and-sync.outputs.typo3_version }}
+            **Source:** https://github.com/TYPO3/typo3/tree/${{ steps.check.outputs.typo3_version }}
             **Path:** `Build/Sources/TypeScript/`
           draft: false
           prerelease: false
-
-  trigger-v13-sync:
-    if: github.event_name == 'schedule'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Trigger sync for v13.x branch
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.PAT_TOKEN }}
-          script: |
-            await github.rest.actions.createWorkflowDispatch({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              workflow_id: 'sync-and-publish.yml',
-              ref: 'v13.x'
-            });
