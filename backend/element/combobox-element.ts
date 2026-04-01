@@ -12,7 +12,7 @@
  */
 
 import { html, LitElement, css, type TemplateResult } from 'lit';
-import { customElement, property, state } from 'lit/decorators';
+import { customElement, property, state } from 'lit/decorators.js';
 import type { PropertyValues } from '@lit/reactive-element';
 import '@typo3/backend/element/icon-element';
 
@@ -587,11 +587,11 @@ export class ComboboxElement extends LitElement {
         }
         break;
       case 'Escape':
-        event.preventDefault();
         this.lastAction = Action.NAVIGATION;
         if (this.isOpen) {
           // First ESC closes the dropdown
           this.isOpen = false;
+          event.preventDefault();
           event.stopPropagation();
         } else {
           // Second ESC (or ESC when dropdown is closed) clears the value
@@ -600,6 +600,7 @@ export class ComboboxElement extends LitElement {
             this.clearInput();
             // Prevent dropdown from opening after clearing
             this.isOpen = false;
+            event.preventDefault();
             event.stopPropagation();
           }
         }

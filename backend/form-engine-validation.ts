@@ -22,12 +22,15 @@ import Modal from '@typo3/backend/modal';
 import Severity from '@typo3/backend/severity';
 import Utility from './utility';
 import RegularEvent from '@typo3/core/event/regular-event';
+import ThrottleEvent from '@typo3/core/event/throttle-event';
 import DomHelper from '@typo3/backend/utility/dom-helper';
 import { selector } from '@typo3/core/literals';
 import SubmitInterceptor from '@typo3/backend/form/submit-interceptor';
 import { FormEngineReview } from '@typo3/backend/form-engine-review';
 import type FormEngine from '@typo3/backend/form-engine';
 import type { FormEngineFieldElement } from '@typo3/backend/form-engine';
+import coreCoreLabels from '~labels/core.core';
+import listLabels from '~labels/core.mod_web_list';
 
 type CustomEvaluationCallback = (value: string) => string;
 type FormEngineInputParams = { field: string, evalList?: string, is_in?: string };
@@ -74,6 +77,10 @@ export default class FormEngineValidation {
       FormEngineValidation.validateField(target);
       formEngineInstance.markFieldAsChanged(target);
     }).delegateTo(formEngineInstance.formElement, FormEngineValidation.rulesSelector);
+
+    new ThrottleEvent('input', (e: Event, target: FormEngineFieldElement): void => {
+      FormEngineValidation.validateField(target);
+    }, 100).delegateTo(formEngineInstance.formElement, FormEngineValidation.rulesSelector);
 
     FormEngineValidation.registerSubmitCallback();
 
@@ -493,7 +500,7 @@ export default class FormEngineValidation {
    */
   public static validate(section?: Element): void {
     if (typeof section === 'undefined' || section instanceof Document) {
-      formEngineInstance.formElement.querySelectorAll(FormEngineValidation.markerSelector + ', .t3js-tabmenu-item').forEach((tabMenuItem: HTMLElement): void => {
+      formEngineInstance.formElement.querySelectorAll(FormEngineValidation.markerSelector + ', [role="tablist"] > .nav-item').forEach((tabMenuItem: HTMLElement): void => {
         tabMenuItem.classList.remove(FormEngineValidation.validationErrorClass);
       });
     }
@@ -570,8 +577,8 @@ export default class FormEngineValidation {
 
       const id = pane.id;
       formEngineInstance.formElement
-        .querySelector('[data-bs-target="#' + id + '"]')
-        .closest('.t3js-tabmenu-item')
+        .querySelector(selector`[data-typo3-tab="${'#' + id}"]`)
+        .closest('.nav-item')
         .classList.toggle(FormEngineValidation.validationErrorClass, !isValid);
     });
   }
@@ -596,12 +603,12 @@ export default class FormEngineValidation {
 
   public static showErrorModal(): void {
     const modal = Modal.confirm(
-      TYPO3.lang.alert || 'Alert',
-      TYPO3.lang['FormEngine.fieldsMissing'],
+      coreCoreLabels.get('labels.fieldsMissing.title'),
+      coreCoreLabels.get('labels.fieldsMissing'),
       Severity.error,
       [
         {
-          text: TYPO3.lang['button.ok'] || 'OK',
+          text: listLabels.get('button.ok'),
           active: true,
           btnClass: 'btn-default',
           name: 'ok',

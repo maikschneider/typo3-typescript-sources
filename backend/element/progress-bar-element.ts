@@ -12,8 +12,8 @@
  */
 
 import { css, html, LitElement, nothing, type PropertyValues, type TemplateResult } from 'lit';
-import { customElement, property } from 'lit/decorators';
-import { classMap } from 'lit/directives/class-map';
+import { customElement, property } from 'lit/decorators.js';
+import { classMap } from 'lit/directives/class-map.js';
 import { styleMap } from 'lit/directives/style-map.js';
 import Severity from '@typo3/backend/severity';
 import { SeverityEnum } from '@typo3/backend/enum/severity';
@@ -153,6 +153,10 @@ export class ProgressBarElement extends LitElement {
    * element while a new start() has already begun.
    */
   private abortController: AbortController = new AbortController();
+
+  public isRunning(): boolean {
+    return !this.abortController.signal.aborted;
+  }
 
   /**
    * Start the progress bar. Sets value to 0 by default or undefined for indeterminate mode.

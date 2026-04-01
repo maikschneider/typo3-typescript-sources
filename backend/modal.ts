@@ -12,10 +12,10 @@
  */
 
 import { html, nothing, LitElement, type TemplateResult, type PropertyValues } from 'lit';
-import { customElement, property, state, query } from 'lit/decorators';
-import { unsafeHTML } from 'lit/directives/unsafe-html';
-import { classMap, type ClassInfo } from 'lit/directives/class-map';
-import { ifDefined } from 'lit/directives/if-defined';
+import { customElement, property, state, query } from 'lit/decorators.js';
+import { unsafeHTML } from 'lit/directives/unsafe-html.js';
+import { classMap, type ClassInfo } from 'lit/directives/class-map.js';
+import { ifDefined } from 'lit/directives/if-defined.js';
 import { classesArrayToClassInfo } from '@typo3/core/lit-helper';
 import RegularEvent from '@typo3/core/event/regular-event';
 import type { AjaxResponse } from '@typo3/core/ajax/ajax-response';
@@ -26,6 +26,8 @@ import AjaxRequest from '@typo3/core/ajax/ajax-request';
 import Severity from './severity';
 import '@typo3/backend/element/icon-element';
 import '@typo3/backend/element/spinner-element';
+import coreLabels from '~labels/core.core';
+import listLabels from '~labels/core.mod_web_list';
 
 export enum Identifiers {
   modal = '.t3js-modal',
@@ -41,6 +43,7 @@ export enum Sizes {
   medium = 'medium',
   large = 'large',
   full = 'full',
+  expand = 'expand',
 }
 
 export enum Positions {
@@ -49,6 +52,7 @@ export enum Positions {
   end = 'end',
   bottom = 'bottom',
   start = 'start',
+  sheet = 'sheet',
 }
 
 export enum Styles {
@@ -140,7 +144,10 @@ export class ModalElement extends LitElement {
   }
 
   protected async doHideModal(): Promise<void> {
-    this.trigger('typo3-modal-hide');
+    const event = this.trigger('typo3-modal-hide', true);
+    if (event.defaultPrevented) {
+      return;
+    }
 
     // Add closing class to trigger animation
     this.dialog.classList.add('modal-closing');
@@ -159,6 +166,10 @@ export class ModalElement extends LitElement {
   }
 
   protected async showModal(): Promise<void> {
+    // Wait a frame to avoid a visual bug where top layer
+    // elements interfere with each other during promotion
+    await new Promise(resolve => requestAnimationFrame(resolve));
+
     this.trigger('typo3-modal-show');
     this.dialog.showModal();
 
@@ -199,6 +210,7 @@ export class ModalElement extends LitElement {
           class=${classMap(classes)}
           aria-labelledby=${ifDefined(this.hideHeader ? undefined : `t3-modal-header-${this.uniqueId}`)}
           aria-label=${ifDefined(this.hideHeader ? this.modalTitle : undefined)}
+          closedby=${this.hideCloseButton ? 'none' : 'closerequest'}
           @close=${this.handleDialogClose}
           @cancel=${this.handleDialogCancel}
           @click=${this.handleDialogClick}
@@ -209,7 +221,7 @@ export class ModalElement extends LitElement {
             ${this.hideCloseButton ? nothing : html`
               <button class="modal-header-close t3js-modal-close" @click=${() => this.hideModal()}>
                 <typo3-backend-icon identifier="actions-close" size="small"></typo3-backend-icon>
-                <span class="visually-hidden">${TYPO3?.lang?.['button.close'] || 'Close'} ${this.modalTitle}</span>
+                <span class="visually-hidden">${(listLabels.get('button.close')) + ' ' + this.modalTitle}</span>
               </button>
             `}
           </div>
@@ -228,19 +240,30 @@ export class ModalElement extends LitElement {
     this.trigger('typo3-modal-hidden');
   }
 
+  /**
+   * Handle Escape key (implicit cancel) or explicit cancel events via `dialog.requestClose()`
+   */
   private handleDialogCancel(e: Event): void {
-    // Intercept the cancel event (Escape key) to show animation
-    e.preventDefault();
-    this.hideModal();
+    if (this.hideCloseButton) {
+      e.preventDefault();
+    }
+    if (e.defaultPrevented) {
+      // Show shake animation if we (or another event listener component)
+      // prevented the default behavior (=close) of the cancel event
+      this.shake();
+    } else {
+      // Intercept the cancel event to show animation
+      e.preventDefault();
+      this.hideModal();
+    }
   }
 
   private handleDialogClick(e: Event): void {
     if (e.target === this.dialog) {
       if (this.staticBackdrop) {
-        e.preventDefault();
         this.shake();
       } else {
-        this.hideModal();
+        this.requestClose();
       }
     }
   }
@@ -290,6 +313,7 @@ export class ModalElement extends LitElement {
         if (iframe.contentDocument.title) {
           this.modalTitle = iframe.contentDocument.title;
         }
+        iframe.contentDocument.addEventListener('keydown', this.handleIframeKeydown);
       };
       return html`
         <iframe src="${this.content}" name="modal_frame" class="modal-iframe t3js-modal-iframe" @load=${loadCallback}></iframe>
@@ -326,9 +350,48 @@ export class ModalElement extends LitElement {
     `;
   }
 
-  private trigger(event: string): void {
-    this.dispatchEvent(new CustomEvent(event, { bubbles: true, composed: true }));
+  private trigger(event: string, cancelable: boolean = false): CustomEvent {
+    const customEvent = new CustomEvent(event, { bubbles: true, composed: true, cancelable });
+    this.dispatchEvent(customEvent);
+    return customEvent;
   }
+
+  /**
+   * Compatibility wrapper for dialog.requestClose which is (by the time of writing)
+   * baseline "newly available" [1] and not available in our CI chrome version.
+   * @todo remove this wrapper once `dialog.requestClose()` becomes widely available,
+   *       all logic is already implemented in the `cancel` event handler and duplicated
+   *       here for the sake of browser compatibility
+   * [1] https://developer.mozilla.org/en-US/docs/Web/API/HTMLDialogElement/requestClose
+   */
+  private requestClose(): void {
+    if ('requestClose' in this.dialog) {
+      this.dialog.requestClose();
+    } else if (this.hideCloseButton) {
+      this.hideModal();
+    } else {
+      this.shake();
+    }
+  }
+
+  private readonly handleIframeKeydown = (e: KeyboardEvent): void => {
+    if (e.key === 'Escape') {
+      if (e.target instanceof e.view.window.HTMLInputElement && e.target.type === 'search') {
+        if (e.target.value === '') {
+          this.requestClose();
+        }
+        return;
+      }
+
+      // Don't close modal if default behavior (default behavior = close)
+      // was prevented by another component
+      if (e.defaultPrevented) {
+        return;
+      }
+
+      this.requestClose();
+    }
+  };
 
   private shake(): void {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
@@ -430,13 +493,13 @@ class Modal {
     if (buttons.length === 0) {
       buttons.push(
         {
-          text: TYPO3?.lang?.['button.cancel'] || 'Cancel',
+          text: listLabels.get('button.cancel'),
           active: true,
           btnClass: 'btn-default',
           name: 'cancel',
         },
         {
-          text: TYPO3?.lang?.['button.ok'] || 'OK',
+          text: listLabels.get('button.ok'),
           btnClass: 'btn-' + Severity.getCssClass(severity),
           name: 'ok',
         },
@@ -574,7 +637,7 @@ class Modal {
       if ('bsContent' in triggerElement.dataset && !('content' in triggerElement.dataset)) {
         console.error('TYPO3 v14 modal trigger dropped support for the legacy `data-bs-content` attribute. Use `data-content` instead. Affected element:', triggerElement);
       }
-      const content = triggerElement.dataset.content || TYPO3?.lang?.['message.confirmation'] || 'Are you sure?';
+      const content = triggerElement.dataset.content || coreLabels.get('message.confirmation');
       let severity = SeverityEnum.notice;
       if (triggerElement.dataset.severity in SeverityEnum) {
         const severityKey = triggerElement.dataset.severity as keyof typeof SeverityEnum;
@@ -609,7 +672,7 @@ class Modal {
         staticBackdrop,
         buttons: [
           {
-            text: triggerElement.dataset.buttonCloseText || TYPO3?.lang?.['button.close'] || 'Close',
+            text: triggerElement.dataset.buttonCloseText || listLabels.get('button.close'),
             active: true,
             btnClass: 'btn-default',
             trigger: (e: Event, modal: ModalElement): void => {
@@ -621,7 +684,7 @@ class Modal {
             },
           },
           {
-            text: triggerElement.dataset.buttonOkText || TYPO3?.lang?.['button.ok'] || 'OK',
+            text: triggerElement.dataset.buttonOkText || listLabels.get('button.ok'),
             btnClass: 'btn-' + Severity.getCssClass(severity),
             trigger: (e: Event, modal: ModalElement): void => {
               modal.hideModal();

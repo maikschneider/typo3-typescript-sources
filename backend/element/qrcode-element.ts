@@ -16,8 +16,10 @@ import { html, LitElement, nothing, type TemplateResult } from 'lit';
 import AjaxRequest from '@typo3/core/ajax/ajax-request';
 import '@typo3/backend/element/spinner-element';
 import '@typo3/backend/element/icon-element';
+import '@typo3/backend/copy-to-clipboard';
 import type { AjaxResponse } from '@typo3/core/ajax/ajax-response';
-import { unsafeHTML } from 'lit/directives/unsafe-html';
+import { unsafeHTML } from 'lit/directives/unsafe-html.js';
+import labels from '~labels/backend.qrcode';
 
 enum QrCodeSize {
   small = 64,
@@ -33,7 +35,8 @@ enum QrCodeSize {
  * <typo3-qrcode
  *   content="https://example.com/"
  *   size="large"
- *   show-download="true">
+ *   show-download
+ *   show-url>
  * </typo3-qrcode>
  *
  * @internal this is subject to change
@@ -42,10 +45,17 @@ enum QrCodeSize {
 export class QrCodeElement extends LitElement {
   @property({ type: String, reflect: true }) content: string = '';
   @property({ type: Boolean, reflect: true, attribute: 'show-download' }) showDownload: boolean = false;
+  @property({ type: Boolean, reflect: true, attribute: 'show-url' }) showUrl: boolean = false;
   @property({ type: String, reflect: true }) size: QrCodeSize = QrCodeSize.small;
 
   @state() private qrcodePreview: TemplateResult = html`
     <typo3-backend-spinner size="large"></typo3-backend-spinner>`;
+
+  public constructor() {
+    super();
+    document.addEventListener('copy-to-clipboard-success', this.showCopySuccess.bind(this));
+    document.addEventListener('copy-to-clipboard-error', this.showCopyError.bind(this));
+  }
 
   public override connectedCallback() {
     super.connectedCallback();
@@ -55,6 +65,7 @@ export class QrCodeElement extends LitElement {
   protected override render(): TemplateResult | symbol {
     return html`
       <div class="preview">${this.qrcodePreview}</div>
+      ${this.getUrlSection()}
       ${this.getControls()}
     `;
   }
@@ -63,16 +74,36 @@ export class QrCodeElement extends LitElement {
     return this;
   }
 
+  private getUrlSection(): TemplateResult | symbol {
+    if (!this.showUrl) {
+      return nothing;
+    }
+    const urlLabel = labels.get('qrcode.url');
+    const copyUrlLabel = labels.get('qrcode.copyUrl');
+    return html`
+      <div class="form-group url-info-section">
+        <label class="form-label">${urlLabel}</label>
+        <div class="input-group">
+          <input type="text" class="form-control" readonly .value="${this.content}">
+          <typo3-copy-to-clipboard text="${this.content}" class="btn btn-default" silent>
+            <typo3-backend-icon identifier="actions-clipboard" size="small"></typo3-backend-icon>
+            ${copyUrlLabel}
+          </typo3-copy-to-clipboard>
+        </div>
+      </div>
+    `;
+  }
+
   private getControls(): TemplateResult {
     if (!this.showDownload) {
       return html`${nothing}`;
     }
 
-    const pngLabel = TYPO3.lang['qrcode.format.png'] || 'PNG';
-    const svgLabel = TYPO3.lang['qrcode.format.svg'] || 'SVG';
-    const formatLabel = TYPO3.lang['qrcode.format'] || 'Format';
-    const sizeLabel = TYPO3.lang['qrcode.size'] || 'Size';
-    const downloadLabel = TYPO3.lang['qrcode.download'] || 'Download';
+    const pngLabel = labels.get('qrcode.format.png');
+    const svgLabel = labels.get('qrcode.format.svg');
+    const formatLabel = labels.get('qrcode.format');
+    const sizeLabel = labels.get('qrcode.size');
+    const downloadLabel = labels.get('qrcode.download');
 
     return html`
       <form name="qrcode-download" method="POST" action="${TYPO3.settings.ajaxUrls.qrcode_download}">
@@ -119,6 +150,22 @@ export class QrCodeElement extends LitElement {
     }).get({ cache: 'no-cache' }).then(async (response: AjaxResponse): Promise<void> => {
       this.qrcodePreview = html`${unsafeHTML(await response.resolve())}`;
     });
+  }
+
+  private showCopySuccess(): void {
+    const urlInfoSection = this.querySelector('.url-info-section');
+    if (urlInfoSection !== null) {
+      urlInfoSection.classList.add('copy-success');
+      setTimeout(() => urlInfoSection.classList.remove('copy-success'), 500);
+    }
+  }
+
+  private showCopyError(): void {
+    const urlInfoSection = this.querySelector('.url-info-section');
+    if (urlInfoSection !== null) {
+      urlInfoSection.classList.add('copy-error');
+      setTimeout(() => urlInfoSection.classList.remove('copy-error'), 750);
+    }
   }
 }
 

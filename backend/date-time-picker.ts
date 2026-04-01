@@ -17,7 +17,9 @@ import ShortcutButtonsPlugin from 'shortcut-buttons-flatpickr';
 import { DateTime } from 'luxon';
 import ThrottleEvent from '@typo3/core/event/throttle-event';
 import type { PostValidationEvent } from '@typo3/backend/form-engine-validation';
+import type { DateConfiguration } from '@typo3/backend/type/date-configuration';
 import '@typo3/backend/input/clearable';
+import coreLabels from '~labels/core.core';
 
 const ISO8601_LOCALTIME = 'ISO8601_LOCALTIME';
 
@@ -30,7 +32,7 @@ interface FlatpickrInputElement extends HTMLInputElement {
  * contains all logic for the date time picker used in FormEngine, EXT:belog and EXT:scheduler
  */
 class DateTimePicker {
-  private readonly format: string = (typeof opener?.top?.TYPO3 !== 'undefined' ? opener.top : top).TYPO3.settings.DateTimePicker.DateFormat;
+  private readonly format: DateConfiguration = (typeof opener?.top?.TYPO3 !== 'undefined' ? opener.top : top).TYPO3.settings.DateConfiguration;
 
   /**
    * initialize date fields to add a datepicker to each field
@@ -236,7 +238,7 @@ class DateTimePicker {
           theme: 'typo3',
           button: [
             {
-              label: top.TYPO3.lang['labels.datepicker.today'] || 'Today'
+              label: coreLabels.get('labels.datepicker.today')
             },
           ],
           onClick: (index: number, fp: flatpickr.Instance) => {
@@ -249,11 +251,11 @@ class DateTimePicker {
     // set options based on type
     switch (type) {
       case 'datetime':
-        options.altFormat = format[1];
+        options.altFormat = format.formats.datetime;
         options.enableTime = true;
         break;
       case 'date':
-        options.altFormat = format[0];
+        options.altFormat = format.formats.date;
         break;
       case 'time':
         options.altFormat = 'HH:mm';
@@ -267,7 +269,7 @@ class DateTimePicker {
         options.noCalendar = true;
         break;
       case 'datetimesec':
-        options.altFormat = format[0] + ' HH:mm:ss';
+        options.altFormat = format.formats.date + ' HH:mm:ss';
         options.enableSeconds = true;
         options.enableTime = true;
         break;

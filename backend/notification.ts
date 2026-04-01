@@ -12,14 +12,14 @@
  */
 
 import { LitElement, html, type TemplateResult } from 'lit';
-import { customElement, property, state } from 'lit/decorators';
-import { classMap } from 'lit/directives/class-map';
-import { ifDefined } from 'lit/directives/if-defined';
+import { customElement, property, state } from 'lit/decorators.js';
+import { classMap } from 'lit/directives/class-map.js';
+import { ifDefined } from 'lit/directives/if-defined.js';
 import type { AbstractAction } from './action-button/abstract-action';
 import { SeverityEnum } from './enum/severity';
 import Severity from './severity';
+import coreLabels from '~labels/core.core';
 import '@typo3/backend/element/icon-element';
-import { lll } from '@typo3/core/lit-helper';
 
 interface Action {
   label: string;
@@ -187,7 +187,7 @@ export class ClearNotificationMessages extends LitElement {
 
   protected override render(): TemplateResult {
     return html`<div><button @click=${() => this.clearAll()} class="btn btn-default">
-      <typo3-backend-icon identifier="actions-close" size="small"></typo3-backend-icon> ${lll('button.clearAll') || 'Clear all'}
+      <typo3-backend-icon identifier="actions-close" size="small"></typo3-backend-icon> ${coreLabels.get('notifications.button.clearAll')}
     </button></div>`;
   }
 
