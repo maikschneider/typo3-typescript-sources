@@ -234,7 +234,7 @@ jobs:
           | Branch   | TYPO3 Version | npm tag   |
           |----------|---------------|-----------|
           | `main`   | v14.x         | `latest`  |
-          | `v13.x`  | v13.x         | `v13`     |
+          | `v13.x`  | v13.x         | `v13-latest` |
 
           ## 📝 License
 
@@ -293,7 +293,7 @@ jobs:
 
           MAJOR="${{ matrix.major_version }}"
           if [ "$MAJOR" = "13" ]; then
-            npm publish --access public --tag v13
+            npm publish --access public --tag v13-latest
           else
             npm publish --access public
           fi
