@@ -90,6 +90,7 @@ jobs:
             echo "New version found: $NEW_TAG (previous: $LAST_SYNCED)"
             echo "has_new_version=true" >> $GITHUB_OUTPUT
             echo "typo3_version=$NEW_TAG" >> $GITHUB_OUTPUT
+            echo "release_tag=${NEW_TAG#v}" >> $GITHUB_OUTPUT
           fi
 
       - name: Setup Git
@@ -271,12 +272,11 @@ jobs:
           Source: https://github.com/TYPO3/typo3/tree/${TYPO3_VERSION}
           Path: Build/Sources/TypeScript/"
 
-          # Create tag (remove v-prefix)
-          NPM_VERSION="${TYPO3_VERSION#v}"
-          git tag -a "${NPM_VERSION}" -m "Release ${NPM_VERSION} from TYPO3 ${TYPO3_VERSION}"
+          RELEASE_TAG="${{ steps.check.outputs.release_tag }}"
+          git tag -a "${RELEASE_TAG}" -m "Release ${RELEASE_TAG} from TYPO3 ${TYPO3_VERSION}"
 
           git push origin "${TARGET_BRANCH}"
-          git push origin "${NPM_VERSION}"
+          git push origin "${RELEASE_TAG}"
 
       - name: Setup Node.js
         if: steps.check.outputs.has_new_version == 'true'
@@ -306,8 +306,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
         with:
-          tag_name: ${{ steps.check.outputs.typo3_version }}
-          release_name: TYPO3 ${{ steps.check.outputs.typo3_version }}
+          tag_name: ${{ steps.check.outputs.release_tag }}
+          release_name: TYPO3 ${{ steps.check.outputs.release_tag }}
           body: |
             Synchronized with TYPO3 Core ${{ steps.check.outputs.typo3_version }}
 
