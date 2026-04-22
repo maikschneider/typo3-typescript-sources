@@ -18,8 +18,8 @@ import RegularEvent from '@typo3/core/event/regular-event';
 import Modal from '@typo3/backend/modal';
 
 /**
- * Module: @typo3/setup/setup-module
- * @exports @typo3/setup/setup-module
+ * Module: @typo3/backend/setup-module
+ * @exports @typo3/backend/setup-module
  */
 class SetupModule {
   private avatarWindowRef: Window;

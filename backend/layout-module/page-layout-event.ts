@@ -11,12 +11,12 @@
  * The TYPO3 project - inspiring people to share!
  */
 
-import DocumentService from '@typo3/core/document-service';
-import DateTimePicker from '@typo3/backend/date-time-picker';
+export class HiddenContentCountChangedEvent extends CustomEvent<{ count: number }> {
+  static readonly eventName = 'typo3:page-layout:hidden-content-count-changed';
 
-DocumentService.ready().then(() => {
-  const dateTimePickers: NodeListOf<HTMLInputElement>|null = document.querySelectorAll('.t3js-datetimepicker');
-  dateTimePickers?.forEach((element) => {
-    DateTimePicker.initialize(element);
-  });
-});
+  constructor(count: number) {
+    super(HiddenContentCountChangedEvent.eventName, {
+      detail: { count },
+    });
+  }
+}
