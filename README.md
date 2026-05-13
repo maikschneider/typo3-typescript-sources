@@ -23,7 +23,7 @@ npm install typo3-typescript-sources
 | Branch   | TYPO3 Version | npm tag   |
 |----------|---------------|-----------|
 | `main`   | v14.x         | `latest`  |
-| `v13.x`  | v13.x         | `v13`     |
+| `v13.x`  | v13.x         | `v13-latest` |
 
 ## 📝 License
 
