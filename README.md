@@ -16,14 +16,14 @@ npm install typo3-typescript-sources
 
 - **Original Repository:** [TYPO3/typo3](https://github.com/TYPO3/typo3)
 - **Source Path:** `Build/Sources/TypeScript/`
-- **Current TYPO3 Version:** `v14.3.1`
+- **Current TYPO3 Version:** `v14.3.2`
 
 ## 🌿 Branches
 
 | Branch   | TYPO3 Version | npm tag   |
 |----------|---------------|-----------|
 | `main`   | v14.x         | `latest`  |
-| `v13.x`  | v13.x         | `v13`     |
+| `v13.x`  | v13.x         | `v13-latest` |
 
 ## 📝 License
 
