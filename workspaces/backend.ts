@@ -469,6 +469,7 @@ class Backend extends Workspaces {
     }
 
     const workspacesRecordTable = document.querySelector('typo3-workspaces-record-table');
+    workspacesRecordTable.additionalColumns = result.additionalColumns ?? {};
     workspacesRecordTable.results = result.data;
   }
 
@@ -517,9 +518,13 @@ class Backend extends Workspaces {
         filterFields: true
       }),
     ).then(async (response: AjaxResponse): Promise<void> => {
-      const item = (await response.resolve())[0].result.data[0];
-      const modalButtons = [];
+      const details = await response.resolve();
+      const item = details[0]?.result.data[0];
+      if (item === undefined) {
+        return;
+      }
 
+      const modalButtons = [];
       const content = document.createElement('typo3-workspaces-record-information');
       content.record = item;
 
