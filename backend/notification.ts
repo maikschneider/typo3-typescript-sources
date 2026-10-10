@@ -11,7 +11,7 @@
  * The TYPO3 project - inspiring people to share!
  */
 
-import { LitElement, html, type TemplateResult } from 'lit';
+import { LitElement, html, nothing, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { classMap } from 'lit/directives/class-map.js';
 import { ifDefined } from 'lit/directives/if-defined.js';
@@ -119,16 +119,20 @@ class Notification {
     if (this.messageContainer === null || document.getElementById('alert-container') === null) {
       this.messageContainer = document.createElement('div');
       this.messageContainer.setAttribute('id', 'alert-container');
+      this.messageContainer.setAttribute('popover', 'manual');
       this.notificationList = document.createElement('div');
       this.notificationList.setAttribute('class', 'alert-list');
       // Enable focusing for keyboard scrolling (accessibility)
       this.notificationList.setAttribute('tabindex', '0');
+      this.notificationList.setAttribute('aria-live', 'polite');
       this.messageContainer.appendChild(this.notificationList);
 
       this.clearAllButton = <ClearNotificationMessages>document.createElement('typo3-notification-clear-all');
       this.containerItemVisibility();
       this.messageContainer.prepend(this.clearAllButton);
-      document.body.appendChild(this.messageContainer);
+      const target = document.querySelector('typo3-backend-modal:last-of-type .alert-container') ?? document.body;
+      target.appendChild(this.messageContainer);
+      this.messageContainer.showPopover();
 
       document.addEventListener('typo3-notification-open', () => {
         this.totalNotifications++;
@@ -165,7 +169,20 @@ class Notification {
 
   protected static containerItemVisibility() {
     this.clearAllButton.hidden = this.totalNotifications < this.showClearAllButtonCount;
-    this.messageContainer.hidden = this.totalNotifications === 0;
+    try {
+      // Always hide first to ensure we are moved into the foremost top-layer
+      this.messageContainer.hidePopover();
+    } catch (e: unknown) {
+      if (e instanceof DOMException && e.name === 'InvalidStateError') {
+        // Ignored, since popover does not signal showing state,
+        // but may throw when `hidePopover()` is called on a hidden element
+      } else {
+        throw e;
+      }
+    }
+    if (this.totalNotifications > 0) {
+      this.messageContainer.showPopover();
+    }
   }
 }
 
@@ -204,6 +221,13 @@ export class NotificationMessage extends LitElement {
 
   @state() executingAction: number = -1;
 
+  private dismissTimer: number | null = null;
+  private remainingDuration: number = 0;
+  private timerStartedAt: number = 0;
+  private dismissalArmed: boolean = false;
+  private pointerInside: boolean = false;
+  private focusInside: boolean = false;
+
   public override async firstUpdated(): Promise<void> {
     document.addEventListener('typo3-notification-clear-all', async () => {
       this.clear();
@@ -212,15 +236,42 @@ export class NotificationMessage extends LitElement {
     const event = new CustomEvent('typo3-notification-open', { bubbles: true, composed: true });
     this.dispatchEvent(event);
 
+    if (this.notificationDuration > 0) {
+      // Reading a message or reaching its actions takes the time it takes, so the countdown
+      // pauses while the notification is pointed at or focused. This is tracked from the start,
+      // the pointer may already rest where the notification appears.
+      this.remainingDuration = this.notificationDuration * 1000;
+      this.addEventListener('mouseenter', (): void => {
+        this.pointerInside = true;
+        this.pauseDismissal();
+      });
+      this.addEventListener('focusin', (): void => {
+        this.focusInside = true;
+        this.pauseDismissal();
+      });
+      this.addEventListener('mouseleave', (): void => {
+        this.pointerInside = false;
+        this.resumeDismissal();
+      });
+      this.addEventListener('focusout', (event: FocusEvent): void => {
+        this.focusInside = event.relatedTarget instanceof Node && this.contains(event.relatedTarget);
+        this.resumeDismissal();
+      });
+    }
+
     await new Promise(resolve => window.setTimeout(resolve, 200));
     await this.requestUpdate();
     if (this.notificationDuration > 0) {
-      await new Promise(resolve => window.setTimeout(resolve, this.notificationDuration * 1000));
-      this.clear();
+      this.dismissalArmed = true;
+      this.resumeDismissal();
     }
   }
 
   public async clear(): Promise<void> {
+    if (this.dismissTimer !== null) {
+      window.clearTimeout(this.dismissTimer);
+      this.dismissTimer = null;
+    }
     this.dispatchEvent(
       new CustomEvent('typo3-notification-clear', { bubbles: true, composed: true })
     );
@@ -307,12 +358,18 @@ export class NotificationMessage extends LitElement {
             ${this.actions.map((action, index) => html`
               <a href="#"
                  title="${action.label}"
+                 aria-disabled="${this.executingAction >= 0 ? 'true' : nothing}"
                  @click="${async (event: PointerEvent) => {
                    event.preventDefault();
+                   // Pointer events are disabled while executing, keyboard activation is not
+                   if (this.executingAction >= 0) {
+                     return;
+                   }
+                   const target = event.currentTarget as HTMLAnchorElement;
                    this.executingAction = index;
                    await this.updateComplete;
                    if ('action' in action) {
-                     await action.action.execute(event.currentTarget as HTMLAnchorElement);
+                     await action.action.execute(target);
                    }
                    this.clear();
                  }}"
@@ -327,6 +384,33 @@ export class NotificationMessage extends LitElement {
       </div>
     `;
     /* eslint-enable @stylistic/indent */
+  }
+
+  private pauseDismissal(): void {
+    if (this.dismissTimer === null) {
+      return;
+    }
+    window.clearTimeout(this.dismissTimer);
+    this.dismissTimer = null;
+    this.remainingDuration -= Date.now() - this.timerStartedAt;
+  }
+
+  private resumeDismissal(): void {
+    if (!this.dismissalArmed || this.dismissTimer !== null || !this.isConnected || this.pointerInside || this.focusInside) {
+      return;
+    }
+    this.startDismissal();
+  }
+
+  private startDismissal(): void {
+    this.timerStartedAt = Date.now();
+    this.dismissTimer = window.setTimeout((): void => {
+      this.dismissTimer = null;
+      // An action being executed clears the notification once it is done
+      if (this.executingAction < 0) {
+        this.clear();
+      }
+    }, Math.max(this.remainingDuration, 0));
   }
 }
 

@@ -318,6 +318,7 @@ export class ModalElement extends LitElement {
             ${this.buttons.map(button => this.renderModalButton(button))}
           </div>
         `}
+        <div class="alert-container"></div>
       </dialog>
     `;
   }
@@ -389,6 +390,8 @@ export class ModalElement extends LitElement {
             if (this.ajaxCallback) {
               this.ajaxCallback(this);
             }
+            // Native autofocus only covers content present when the dialog opens
+            this.querySelector<HTMLElement>(`${Identifiers.body} [autofocus]`)?.focus();
             this.dispatchEvent(new CustomEvent('modal-loaded'));
           });
         })
@@ -944,11 +947,10 @@ class Modal {
     }
 
     currentModal.addEventListener('typo3-modal-shown', (): void => {
-      // focus the button which was configured as active button
-      const activeButton = currentModal.querySelector(`${Identifiers.footer} .t3js-active`) as HTMLInputElement | null;
-      if (activeButton !== null) {
-        activeButton.focus();
-      }
+      // Prefer an autofocus field over the active button
+      const focusTarget = currentModal.querySelector<HTMLElement>(`${Identifiers.body} [autofocus]`)
+        ?? currentModal.querySelector<HTMLElement>(`${Identifiers.footer} .t3js-active`);
+      focusTarget?.focus();
     });
 
     // Remove modal from Modal.instances when hidden
@@ -957,10 +959,15 @@ class Modal {
         const lastIndex = this.instances.length - 1;
         this.instances.splice(lastIndex, 1);
         this.currentModal = this.instances[lastIndex - 1];
+        remountAlertContainer(this.currentModal);
       }
     });
 
     currentModal.addEventListener('typo3-modal-hidden', (): void => {
+      // A notification shown while the modal closes is placed in it, and must not be removed along with it
+      if (currentModal.querySelector('#alert-container') !== null) {
+        remountAlertContainer(this.currentModal);
+      }
       currentModal.remove();
     });
 
@@ -970,11 +977,37 @@ class Modal {
       this.instances.push(currentModal);
     });
 
+    currentModal.addEventListener('typo3-modal-shown', (): void => {
+      remountAlertContainer(currentModal);
+    });
+
     document.body.appendChild(currentModal);
 
     return currentModal;
   }
 }
+
+const remountAlertContainer = (modal: ModalElement | undefined) => {
+  const alertContainer = document.querySelector<HTMLDivElement>('#alert-container');
+  if (alertContainer) {
+    const isOpen = alertContainer.matches(':popover-open');
+    let target: HTMLElement = document.body;
+    if (modal) {
+      target = modal.querySelector('.alert-container') ?? target;
+    }
+
+    if ('moveBefore' in target) {
+      target.moveBefore(alertContainer, null);
+    } else {
+      (target as HTMLElement).appendChild(alertContainer);
+    }
+
+    if (isOpen) {
+      alertContainer.hidePopover();
+      alertContainer.showPopover();
+    }
+  }
+};
 
 let modalObject: Modal = null;
 try {
