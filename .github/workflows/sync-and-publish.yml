@@ -306,8 +306,14 @@ jobs:
         if: matrix.mode == 'tag'
         id: publish
         run: |
+          if [ -z "$ACTIONS_ID_TOKEN_REQUEST_URL" ]; then
+            echo "Error: no OIDC token available, the job needs the id-token: write permission"
+            exit 1
+          fi
+
           # Trusted publishing (OIDC) needs npm >= 11.5.1
           npm install -g npm@^11.5.1
+          npm --version
 
           PUBLISHED=$(npm view "$PACKAGE_NAME" versions --json 2>/dev/null || echo '[]')
 
