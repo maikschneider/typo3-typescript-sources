@@ -32,6 +32,7 @@ import '@typo3/form/backend/form-editor/component/date-editor';
 import {
   DateEditorChangeEvent
 } from '@typo3/form/backend/form-editor/component/date-editor';
+import { writeAdditionalElementPropertyPaths } from '@typo3/form/backend/form-editor/additional-element-property-paths';
 
 import type { FormEditor } from '@typo3/form/backend/form-editor';
 import type {
@@ -280,6 +281,14 @@ function renderEditorDispatcher(
         collectionName
       );
       break;
+    case 'Inspector-CountrySingleSelectEditor':
+      renderCountrySingleSelectEditor(
+        editorConfiguration,
+        editorHtml,
+        collectionElementIdentifier,
+        collectionName
+      );
+      break;
     case 'Inspector-SingleSelectEditor':
       renderSingleSelectEditor(
         editorConfiguration,
@@ -388,7 +397,24 @@ function listenOnElementBrowser(): void {
         getHelper().getDomElementDataAttribute('contentElementSelectorTarget', 'bracesWithKeyValue', [e.data.fieldName])
       );
       if (targetEl) {
-        targetEl.value = result.pop() ?? '';
+        const newValue: string = result.pop() ?? '';
+        const maxItems: number = Number(targetEl.dataset.maxItems ?? 1);
+
+        if (maxItems === 1) {
+          targetEl.value = newValue;
+        } else {
+          const currentValues: Array<string> = targetEl.value.split(',').filter((str) => str !== '');
+
+          // Enforce the configured maximum and avoid duplicate records already
+          // present in the list. Selecting beyond the limit is silently ignored;
+          // the value can still be adjusted manually in the input field.
+          if (newValue !== '' && !currentValues.includes(newValue) && currentValues.length < maxItems) {
+            currentValues.push(newValue);
+          }
+
+          targetEl.value = currentValues.join(',');
+        }
+
         targetEl.dispatchEvent(new Event('paste'));
       }
     }
@@ -645,7 +671,7 @@ function setRandomIds(html: HTMLElement): void {
 
   const idReplacements: Record<string, string> = {};
 
-  html.querySelectorAll<HTMLElement>(getHelper().getDomElementDataAttribute('randomId', 'bracesWithKey')).forEach(function(element: HTMLElement) {
+  html.querySelectorAll<HTMLElement>(getHelper().getDomElementDataAttribute('randomId', 'bracesWithKey')).forEach(function(element) {
     const targetAttribute = element.getAttribute(getHelper().getDomElementDataAttribute('randomIdTarget'));
     const randomIdIndex = element.getAttribute(getHelper().getDomElementDataAttribute('randomIdIndex'));
 
@@ -1158,14 +1184,7 @@ export function renderTextEditor(
   const inputEl = getHelper().getTemplatePropertyElement('propertyPath', editorHtml) as HTMLInputElement | null;
   if (inputEl) { inputEl.value = propertyData ?? ''; }
 
-  if (
-    !getUtility().isUndefinedOrNull(editorConfiguration.additionalElementPropertyPaths)
-    && Array.isArray(editorConfiguration.additionalElementPropertyPaths)
-  ) {
-    for (let i = 0, len = editorConfiguration.additionalElementPropertyPaths.length; i < len; ++i) {
-      getCurrentlySelectedFormElement().set(editorConfiguration.additionalElementPropertyPaths[i], propertyData);
-    }
-  }
+  writeAdditionalElementPropertyPaths(getCurrentlySelectedFormElement(), editorConfiguration, propertyData, false);
 
   renderFormElementSelectorEditorAddition(editorConfiguration, editorHtml, propertyPath);
 
@@ -1182,21 +1201,12 @@ export function renderTextEditor(
       getCurrentlySelectedFormElement().set(propertyPath, this.value);
     }
     validateCollectionElement(propertyPath, editorHtml);
-    if (
-      !getUtility().isUndefinedOrNull(editorConfiguration.additionalElementPropertyPaths)
-      && Array.isArray(editorConfiguration.additionalElementPropertyPaths)
-    ) {
-      for (let i = 0, len = editorConfiguration.additionalElementPropertyPaths.length; i < len; ++i) {
-        if (
-          !!editorConfiguration.doNotSetIfPropertyValueIsEmpty
-          && !getUtility().isNonEmptyString(this.value)
-        ) {
-          getCurrentlySelectedFormElement().unset(editorConfiguration.additionalElementPropertyPaths[i]);
-        } else {
-          getCurrentlySelectedFormElement().set(editorConfiguration.additionalElementPropertyPaths[i], this.value);
-        }
-      }
-    }
+    writeAdditionalElementPropertyPaths(
+      getCurrentlySelectedFormElement(),
+      editorConfiguration,
+      this.value,
+      !getUtility().isNonEmptyString(this.value)
+    );
   }
 }
 
@@ -1309,10 +1319,67 @@ export function renderCountrySelectEditor(
 
   selectElement?.addEventListener('change', function(this: HTMLSelectElement) {
     const selectValues: string[] = [];
-    this.querySelectorAll<HTMLOptionElement>('option:checked').forEach(function(opt: HTMLOptionElement) {
+    this.querySelectorAll<HTMLOptionElement>('option:checked').forEach(function(opt) {
       selectValues.push((opt as any)._dataValue);
     });
     getCurrentlySelectedFormElement().set(propertyPath, selectValues);
+    validateCollectionElement(propertyPath, editorHtml);
+  });
+}
+
+export function renderCountrySingleSelectEditor(
+  editorConfiguration: EditorConfiguration,
+  editorHtml: HTMLElement,
+  collectionElementIdentifier: string,
+  collectionName: keyof FormEditorDefinitions
+): void {
+  assert(
+    typeof editorConfiguration === 'object' && editorConfiguration !== null && !Array.isArray(editorConfiguration),
+    'Invalid parameter "editorConfiguration"',
+    1743955200
+  );
+  assert(
+    typeof editorHtml === 'object' && editorHtml !== null && !Array.isArray(editorHtml),
+    'Invalid parameter "editorHtml"',
+    1743955201
+  );
+  assert(
+    getUtility().isNonEmptyString(editorConfiguration.label),
+    'Invalid configuration "label"',
+    1743955202
+  );
+  assert(
+    getUtility().isNonEmptyString(editorConfiguration.propertyPath),
+    'Invalid configuration "propertyPath"',
+    1743955203
+  );
+
+  const propertyPath = getFormEditorApp().buildPropertyPath(
+    editorConfiguration.propertyPath,
+    collectionElementIdentifier,
+    collectionName
+  );
+
+  setLabelHtmlContent(getHelper().getTemplatePropertyElement('label', editorHtml), editorConfiguration.label);
+  renderDescription(editorConfiguration, editorHtml);
+
+  const selectElement = getHelper().getTemplatePropertyElement('selectOptions', editorHtml) as HTMLSelectElement | null;
+  const propertyData: string = getCurrentlySelectedFormElement().get(propertyPath) || '';
+  validateCollectionElement(propertyPath, editorHtml);
+
+  const options = Array.from(selectElement?.querySelectorAll('option') ?? []);
+  selectElement?.replaceChildren();
+
+  for (let i = 0, len = options.length; i < len; ++i) {
+    const selected = options[i].value === propertyData;
+    const option = new Option(options[i].text, i.toString(), false, selected);
+    option.dataset.value = options[i].value;
+    selectElement?.append(option);
+  }
+
+  selectElement?.addEventListener('change', function(this: HTMLSelectElement) {
+    const selectedOpt = this.querySelector<HTMLOptionElement>('option:checked');
+    getCurrentlySelectedFormElement().set(propertyPath, selectedOpt?.dataset.value ?? '');
     validateCollectionElement(propertyPath, editorHtml);
   });
 }
@@ -1436,7 +1503,7 @@ export function renderMultiSelectEditor(
 
   selectElement?.addEventListener('change', function(this: HTMLSelectElement) {
     const selectValues: string[] = [];
-    this.querySelectorAll<HTMLOptionElement>('option:checked').forEach(function(opt: HTMLOptionElement) {
+    this.querySelectorAll<HTMLOptionElement>('option:checked').forEach(function(opt) {
       selectValues.push((opt as any)._dataValue);
     });
     getCurrentlySelectedFormElement().set(propertyPath, selectValues);
@@ -1644,9 +1711,9 @@ export function renderPropertyGridEditor(
       }));
     } else if (typeof rawData === 'object') {
       // Handle object case: { value: label }
-      propertyEntries = Object.entries(rawData).map(([value, label]: [string, string]): PropertyGridEditorEntry => ({
+      propertyEntries = Object.entries(rawData).map(([value, label]): PropertyGridEditorEntry => ({
         id: 'fe' + Math.floor(Math.random() * 42) + Date.now(),
-        label,
+        label: label as string,
         value,
         selected: false,
       }));
@@ -2084,7 +2151,14 @@ export function renderTypo3WinBrowserEditor(
   validateCollectionElement(propertyPath, editorHtml);
 
   const inputEl = getHelper().getTemplatePropertyElement('propertyPath', editorHtml) as HTMLInputElement | null;
-  if (inputEl) { inputEl.value = propertyData ?? ''; }
+  if (inputEl) {
+    inputEl.value = propertyData ?? '';
+
+    const maxItems: number = getUtility().isUndefinedOrNull(editorConfiguration.maxItems)
+      ? 1
+      : editorConfiguration.maxItems;
+    inputEl.dataset.maxItems = maxItems.toString();
+  }
 
   inputEl?.addEventListener('keyup', handleInput);
   inputEl?.addEventListener('paste', handleInput);
@@ -2178,7 +2252,7 @@ function getFormElementSelectorEntries(): FormElementSelectorEntry[] {
   return ((): FormElementSelectorEntry[] => {
     const nonCompositeNonToplevelFormElements = getFormEditorApp().getNonCompositeNonToplevelFormElements();
 
-    return nonCompositeNonToplevelFormElements.map((nonCompositeNonToplevelFormElement: FormElement): FormElementSelectorEntry => ({
+    return nonCompositeNonToplevelFormElements.map((nonCompositeNonToplevelFormElement): FormElementSelectorEntry => ({
       icon: getFormElementDefinition(nonCompositeNonToplevelFormElement, 'iconIdentifier'),
       label: nonCompositeNonToplevelFormElement.get('label'),
       value: nonCompositeNonToplevelFormElement.get('identifier'),

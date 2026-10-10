@@ -188,7 +188,7 @@ export class RecordTableElement extends LitElement {
     }
 
     if (data.Workspaces_CollectionParent !== '') {
-      parentItem = this.results.find((element: any) => {
+      parentItem = this.results.find((element) => {
         return element.Workspaces_CollectionCurrent === data.Workspaces_CollectionParent;
       });
     }
@@ -427,7 +427,7 @@ export class RecordTableElement extends LitElement {
    * @param {string} action
    * @param {string} iconIdentifier
    * @param {object} additionalAttributes
-   * @return {JQuery}
+   * @return {TemplateResult}
    */
   private getAction(condition: boolean, action: string, iconIdentifier: string, additionalAttributes?: Record<string, string>): TemplateResult {
     return html`

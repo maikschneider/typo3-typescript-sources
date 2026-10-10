@@ -33,7 +33,7 @@ import coreCoreLabels from '~labels/core.core';
 import listLabels from '~labels/core.mod_web_list';
 
 type CustomEvaluationCallback = (value: string) => string;
-type FormEngineInputParams = { field: string, evalList?: string, is_in?: string };
+type FormEngineInputParams = { field: string, evalList?: string, is_in?: string, scale?: number };
 
 export interface PostValidationEvent {
   field: FormEngineFieldElement,
@@ -65,7 +65,7 @@ export default class FormEngineValidation {
    */
   public static initialize(formEngine: typeof FormEngine): void {
     formEngineInstance = formEngine;
-    formEngineInstance.formElement.querySelectorAll('.' + FormEngineValidation.errorClass).forEach((e: HTMLElement) => e.classList.remove(FormEngineValidation.errorClass));
+    formEngineInstance.formElement.querySelectorAll<HTMLElement>('.' + FormEngineValidation.errorClass).forEach((e) => e.classList.remove(FormEngineValidation.errorClass));
 
     // Initialize input fields
     FormEngineValidation.initializeInputFields();
@@ -91,7 +91,7 @@ export default class FormEngineValidation {
    * Initialize all input fields
    */
   public static initializeInputFields(): void {
-    formEngineInstance.formElement.querySelectorAll(FormEngineValidation.inputSelector).forEach((visibleField: FormEngineFieldElement): void => {
+    formEngineInstance.formElement.querySelectorAll<FormEngineFieldElement>(FormEngineValidation.inputSelector).forEach((visibleField): void => {
       // ignore fields which already have been initialized
       if ('formengineInputInitialized' in visibleField.dataset) {
         return;
@@ -462,7 +462,7 @@ export default class FormEngineValidation {
         break;
       case 'decimal':
         if (value !== '') {
-          returnValue = FormEngineValidation.parseDouble(value);
+          returnValue = FormEngineValidation.parseDouble(value, config.scale);
         }
         break;
       case 'trim':
@@ -500,7 +500,7 @@ export default class FormEngineValidation {
    */
   public static validate(section?: Element): void {
     if (typeof section === 'undefined' || section instanceof Document) {
-      formEngineInstance.formElement.querySelectorAll(FormEngineValidation.markerSelector + ', [role="tablist"] > .nav-item').forEach((tabMenuItem: HTMLElement): void => {
+      formEngineInstance.formElement.querySelectorAll<HTMLElement>(FormEngineValidation.markerSelector + ', [role="tablist"] > .nav-item').forEach((tabMenuItem): void => {
         tabMenuItem.classList.remove(FormEngineValidation.validationErrorClass);
       });
     }
@@ -511,17 +511,6 @@ export default class FormEngineValidation {
         FormEngineValidation.validateField(field);
       }
     }
-  }
-
-  /**
-   * Helper function to mark a field as changed.
-   *
-   * @deprecated
-   */
-  public static markFieldAsChanged(field: FormEngineFieldElement): void {
-    console.warn('Calling markFieldAsChanged() from \'@typo3/backend/form-engine-validation\' is deprecated and will be removed in TYPO3 v15. Instead, call the method from \'@typo3/backend/form-engine\'.');
-
-    formEngineInstance.markFieldAsChanged(field);
   }
 
   /**
@@ -543,8 +532,12 @@ export default class FormEngineValidation {
 
   /**
    * Parse value to double
+   *
+   * The value is rounded on its digits and not as a number, since a number can not hold
+   * the precision of values with a high scale: (2.000000001).toFixed(30) would return
+   * "2.000000001000000082740370999090".
    */
-  public static parseDouble(value: number|string|boolean, precision: number = 2): string {
+  public static parseDouble(value: number|string|boolean, scale: number = 2): string {
     let theVal = '' + value;
     theVal = theVal.replace(/[^0-9,.-]/g, '');
     const negative = theVal.startsWith('-');
@@ -554,22 +547,31 @@ export default class FormEngineValidation {
       theVal += '.0';
     }
     const parts = theVal.split('.');
-    const dec = parts.pop();
-    let theNumberVal = Number(parts.join('') + '.' + dec);
-    if (negative) {
-      theNumberVal *= -1;
-    }
-    theVal = theNumberVal.toFixed(precision);
+    let decimalDigits = parts.pop();
+    let integerDigits = parts.join('');
 
-    return theVal;
+    if (decimalDigits.length > scale) {
+      const roundUp = Number(decimalDigits.charAt(scale)) >= 5;
+      decimalDigits = decimalDigits.substring(0, scale);
+      if (roundUp) {
+        const rounded = (BigInt(integerDigits + decimalDigits) + 1n).toString().padStart(integerDigits.length + scale, '0');
+        integerDigits = rounded.substring(0, rounded.length - scale);
+        decimalDigits = rounded.substring(rounded.length - scale);
+      }
+    }
+    decimalDigits = decimalDigits.padEnd(scale, '0');
+    integerDigits = integerDigits.replace(/^0+(?=\d)/, '') || '0';
+    theVal = integerDigits + '.' + decimalDigits;
+
+    return (negative && /[1-9]/.test(theVal) ? '-' : '') + theVal;
   }
 
   /**
    * Find tab by field and mark it as has-validation-error
    */
   public static markParentTab(element: FormEngineFieldElement, isValid: boolean): void {
-    const panes = DomHelper.parents(element, '.tab-pane');
-    panes.forEach((pane: HTMLElement): void => {
+    const panes = DomHelper.parents<HTMLElement>(element, '.tab-pane');
+    panes.forEach((pane): void => {
       if (isValid) {
         // If incoming element is valid, check for errors in the same sheet
         isValid = pane.querySelector('.has-error') === null;
@@ -629,5 +631,11 @@ export default class FormEngineValidation {
 
       return false;
     });
+  }
+}
+
+declare global {
+  interface HTMLElementEventMap {
+    't3-formengine-postfieldvalidation': CustomEvent<PostValidationEvent>;
   }
 }

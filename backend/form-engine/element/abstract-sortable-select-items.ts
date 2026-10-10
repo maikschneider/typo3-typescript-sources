@@ -25,7 +25,7 @@ export abstract class AbstractSortableSelectItems {
    * @param {HTMLSelectElement} fieldElement
    */
   private static moveOptionToTop(fieldElement: HTMLSelectElement): void {
-    Array.from(fieldElement.querySelectorAll(':checked')).reverse().forEach((optionEl: HTMLOptionElement): void => {
+    Array.from(fieldElement.querySelectorAll<HTMLOptionElement>(':checked')).reverse().forEach((optionEl): void => {
       fieldElement.insertBefore(optionEl, fieldElement.firstElementChild);
     });
   }
@@ -36,7 +36,7 @@ export abstract class AbstractSortableSelectItems {
    * @param {HTMLSelectElement} fieldElement
    */
   private static moveOptionToBottom(fieldElement: HTMLSelectElement): void {
-    fieldElement.querySelectorAll(':checked').forEach((optionEl: HTMLOptionElement): void => {
+    fieldElement.querySelectorAll<HTMLOptionElement>(':checked').forEach((optionEl): void => {
       fieldElement.insertBefore(optionEl, null);
     });
   }
@@ -85,7 +85,7 @@ export abstract class AbstractSortableSelectItems {
    */
   private static removeOption(fieldElement: HTMLSelectElement, availableFieldElement: HTMLSelectElement): void {
     const previousSelectIndex = fieldElement.selectedIndex;
-    fieldElement.querySelectorAll(':checked').forEach((option: HTMLOptionElement): void => {
+    fieldElement.querySelectorAll<HTMLOptionElement>(':checked').forEach((option): void => {
       const originalOption = <HTMLOptionElement>availableFieldElement.querySelector(selector`option[value="${option.value}"]`);
       if (originalOption !== null) {
         originalOption.classList.remove('hidden');
@@ -119,8 +119,11 @@ export abstract class AbstractSortableSelectItems {
       e.preventDefault();
 
       const relatedFieldName = target.dataset.fieldname;
-      const relatedField = FormEngine.getFieldElement(relatedFieldName).get(0) as HTMLSelectElement;
-      const relatedAvailableValuesField = FormEngine.getFieldElement(relatedFieldName,'_avail').get(0) as HTMLSelectElement;
+      const relatedField = FormEngine.getFieldElement(relatedFieldName) as HTMLSelectElement | null;
+      const relatedAvailableValuesField = FormEngine.getFieldElement(relatedFieldName, '_avail') as HTMLSelectElement | null;
+      if (relatedField === null || relatedAvailableValuesField === null) {
+        return;
+      }
 
       if (target.classList.contains('t3js-btn-moveoption-top')) {
         AbstractSortableSelectItems.moveOptionToTop(fieldElement);
@@ -148,8 +151,11 @@ export abstract class AbstractSortableSelectItems {
    */
   private readonly registerKeyboardEventHandler = (fieldElement: HTMLSelectElement): void => {
     const relatedFieldName = fieldElement.dataset.formengineInputName;
-    const relatedField = FormEngine.getFieldElement(relatedFieldName).get(0) as HTMLSelectElement;
-    const relatedAvailableValuesField = FormEngine.getFieldElement(relatedFieldName,'_avail').get(0) as HTMLSelectElement;
+    const relatedField = FormEngine.getFieldElement(relatedFieldName) as HTMLSelectElement | null;
+    const relatedAvailableValuesField = FormEngine.getFieldElement(relatedFieldName, '_avail') as HTMLSelectElement | null;
+    if (relatedField === null || relatedAvailableValuesField === null) {
+      return;
+    }
 
     new RegularEvent('keydown', (e: KeyboardEvent): void => {
       if (e.code === 'Delete' || e.code === 'Backspace') {

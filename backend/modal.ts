@@ -110,8 +110,7 @@ export interface Button {
 export interface Configuration {
   type: Types;
   title: string;
-  // @todo remove support for JQuery based content
-  content: TemplateResult | string | JQuery | Element | DocumentFragment;
+  content: TemplateResult | string | Element | DocumentFragment;
   severity: SeverityEnum;
   buttons: Array<Button>;
   style: Styles;
@@ -147,7 +146,7 @@ export class ModalElement extends LitElement {
   @property({ type: Array, attribute: false }) buttons: Array<Button> = [];
   @property({ type: String, attribute: 'resize-identifier' }) resizeIdentifier: string = '';
 
-  @state() templateResultContent: TemplateResult | JQuery | Element | DocumentFragment = null;
+  @state() templateResultContent: TemplateResult | Element | DocumentFragment = null;
   @state() activeButton: Button = null;
   @query('dialog', true) dialog: HTMLDialogElement;
   @state() private modalWidth?: number;
@@ -212,7 +211,7 @@ export class ModalElement extends LitElement {
     }
   }
 
-  public setContent(content: TemplateResult | JQuery | Element | DocumentFragment): void {
+  public setContent(content: TemplateResult | Element | DocumentFragment): void {
     this.templateResultContent = content;
   }
 
@@ -409,7 +408,7 @@ export class ModalElement extends LitElement {
     return this.templateResultContent as TemplateResult;
   }
 
-  private renderModalBody(): TemplateResult | JQuery | Element | DocumentFragment {
+  private renderModalBody(): TemplateResult | Element | DocumentFragment {
     if (this.type === Types.iframe) {
       const loadCallback = (e: Event) => {
         const iframe = e.currentTarget as HTMLIFrameElement;
@@ -674,7 +673,7 @@ class Modal {
    * - confirm.button.ok
    *
    * @param {string} title The title for the confirm modal
-   * @param {TemplateResult | string | JQuery | Element | DocumentFragment} content The content for the conform modal, e.g. the main question
+   * @param {TemplateResult | string | Element | DocumentFragment} content The content for the conform modal, e.g. the main question
    * @param {SeverityEnum} severity Default SeverityEnum.warning
    * @param {Array<Button>} buttons An array with buttons, default no buttons
    * @param {Array<string>} additionalCssClasses Additional css classes to add to the modal
@@ -682,7 +681,7 @@ class Modal {
    */
   public confirm(
     title: string,
-    content: TemplateResult | string | JQuery | Element | DocumentFragment,
+    content: TemplateResult | string | Element | DocumentFragment,
     severity: SeverityEnum = SeverityEnum.warning,
     buttons: Array<Button> = [],
     additionalCssClasses?: Array<string>,
@@ -755,7 +754,7 @@ class Modal {
    * Shows a dialog
    *
    * @param {string} title
-   * @param {string | JQuery | Element | DocumentFragment} content
+   * @param {string | Element | DocumentFragment} content
    * @param {number} severity
    * @param {Array<Button>} buttons
    * @param {Array<string>} additionalCssClasses
@@ -763,7 +762,7 @@ class Modal {
    */
   public show(
     title: string,
-    content: string | JQuery | Element | DocumentFragment,
+    content: string | Element | DocumentFragment,
     severity: SeverityEnum = SeverityEnum.info,
     buttons?: Array<Button>,
     additionalCssClasses?: Array<string>,

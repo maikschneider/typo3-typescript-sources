@@ -22,14 +22,14 @@ import { StepSummaryEvent } from '@typo3/backend/wizard/events/step-summary-even
 import {
   DuplicateFormSubmissionService
 } from '@typo3/form/backend/form-wizard/finisher/duplicate-form-submission-service';
-import ModeStep, { type MODE } from '@typo3/form/backend/form-wizard/steps/mode-step';
+import ModeStep from '@typo3/form/backend/form-wizard/steps/mode-step';
 import { CreateFormSubmissionService } from '@typo3/form/backend/form-wizard/finisher/create-form-submission-service';
-import { FormManager, type StorageAdapter } from '@typo3/form/backend/form-manager';
+import { FormManager, type StorageAdapter, type TemplateOption } from '@typo3/form/backend/form-manager';
 import { AutoAdvanceEvent } from '@typo3/backend/wizard/events/auto-advance-event';
 import { StorageStep } from '@typo3/form/backend/form-wizard/steps/storage-step';
 
 export interface FormWizardDataStore extends DataStore {
-  mode?: MODE;
+  template?: TemplateOption | null;
   storage?: StorageAdapter;
   settings?: FormSettings;
 }
@@ -37,7 +37,7 @@ export interface FormWizardDataStore extends DataStore {
 type FormWizardDataStoreKey = keyof FormWizardDataStore;
 
 export interface FormWizardContext {
-  wizard: Wizard;
+  wizard: Wizard<FormWizardDataStore>;
   formManager: FormManager;
   getStoreData: <T extends FormWizardDataStoreKey>(key: T) => NoInfer<FormWizardDataStore[T]>;
   setStoreData: <T extends FormWizardDataStoreKey>(key: T, value: NoInfer<FormWizardDataStore[T]>) => void;
@@ -55,7 +55,7 @@ export class FormWizard extends LitElement {
   @property({ type: FormManager, attribute: false }) formManager: FormManager;
   @property({ type: Object, attribute: false }) duplicateForm?: {name: string, persistenceIdentifier: string} = null;
 
-  @query('typo3-backend-wizard') wizard!: Wizard;
+  @query('typo3-backend-wizard') wizard!: Wizard<FormWizardDataStore>;
 
   override connectedCallback() {
     super.connectedCallback();

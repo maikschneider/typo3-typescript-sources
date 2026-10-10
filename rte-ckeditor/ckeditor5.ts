@@ -2,6 +2,7 @@ import { html, LitElement, type TemplateResult } from 'lit';
 import { customElement, property, queryAssignedElements } from 'lit/decorators.js';
 import AjaxRequest from '@typo3/core/ajax/ajax-request';
 import DebounceEvent from '@typo3/core/event/debounce-event';
+import DocumentService from '@typo3/core/document-service';
 import { prefixAndRebaseCss } from '@typo3/rte-ckeditor/css-prefixer';
 import { ClassicEditor } from '@ckeditor/ckeditor5-editor-classic';
 import type { Editor, EditorConfig, PluginConstructor } from '@ckeditor/ckeditor5-core';
@@ -95,6 +96,9 @@ export class CKEditor5Element extends LitElement {
     if (!(this.target[0] instanceof HTMLTextAreaElement)) {
       throw new Error('No rich-text <textarea> content target found.');
     }
+
+    // The textarea content may still be streamed in while the document is being parsed
+    await DocumentService.ready();
 
     const {
       // options handled by this wrapper
@@ -214,7 +218,7 @@ export class CKEditor5Element extends LitElement {
     const importModules: Array<PluginModuleDescriptor> = normalizeImportModules([
       ...defaultPlugins,
       ...(importModulesOption || []),
-    ]).map((moduleDescriptor: PluginModuleDescriptor) => {
+    ]).map((moduleDescriptor) => {
       const { module } = moduleDescriptor;
       let { exports } = moduleDescriptor;
       for (const toRemove of removeImportModules) {
@@ -227,7 +231,7 @@ export class CKEditor5Element extends LitElement {
 
     const pluginModules: Array<{module: PluginModule, exports: string[]}> = await Promise.all(
       importModules
-        .map(async (moduleDescriptor: PluginModuleDescriptor): Promise<{module: PluginModule, exports: string[]}> => {
+        .map(async (moduleDescriptor): Promise<{module: PluginModule, exports: string[]}> => {
           try {
             return {
               module: await import(moduleDescriptor.module) as PluginModule,
@@ -362,7 +366,7 @@ type PseudoRegExp = {
 function walkObj(data: RecurseMapInput, proc: (value: unknown) => unknown|null): RecurseMapInput {
   if (data !== null && typeof data === 'object') {
     if (Array.isArray(data)) {
-      return data.map((element: RecurseMapInput) => proc(element) ?? walkObj(element, proc));
+      return data.map((element) => proc(element) ?? walkObj(element, proc));
     }
     const newData: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(data)) {

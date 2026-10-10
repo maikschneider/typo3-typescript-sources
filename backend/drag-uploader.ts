@@ -18,6 +18,7 @@ import { MessageUtility } from './utility/message-utility';
 import AjaxRequest from '@typo3/core/ajax/ajax-request';
 import { default as Modal, type ModalElement, Sizes as ModalSizes } from './modal';
 import Notification from './notification';
+import FilePasteHandler from './file-paste-handler';
 import ImmediateAction from '@typo3/backend/action-button/immediate-action';
 import Md5 from '@typo3/backend/hashing/md5';
 import '@typo3/backend/element/icon-element';
@@ -107,6 +108,10 @@ export default class DragUploader {
   private readonly element: HTMLElement;
   private readonly dropzone: HTMLElement;
   private readonly dropzoneMask: HTMLElement;
+  /**
+   * Ancestor a file has to be dragged over to show the dropzone, the whole document if null
+   */
+  private readonly dropzoneArea: HTMLElement | null;
   private readonly fileInput: HTMLInputElement;
   private readonly browserCapabilities: { fileReader: boolean; DnD: boolean; Progress: boolean };
   private readonly dropZoneInsertBefore: boolean;
@@ -129,6 +134,7 @@ export default class DragUploader {
     this.dropzone.setAttribute('hidden', 'hidden');
     this.irreObjectUid = this.element.dataset.fileIrreObject;
     this.manualTable = this.element.hasAttribute('data-manual-table');
+    this.dropzoneArea = this.element.dataset.dropzoneArea ? this.element.closest(this.element.dataset.dropzoneArea) : null;
 
     const dropZoneEscapedTarget = document.querySelector(this.element.dataset.dropzoneTarget);
     if (this.irreObjectUid && DomHelper.nextAll(dropZoneEscapedTarget).length !== 0) {
@@ -212,6 +218,10 @@ export default class DragUploader {
 
     document.addEventListener(uploadFinishedEventName, this.closeDropzone);
 
+    if (this.element.hasAttribute('data-upload-on-paste')) {
+      this.registerPasteTarget();
+    }
+
     // no filelist then create own progress table
     if (this.fileList === null) {
       this.fileList = document.createElement('table');
@@ -258,7 +268,7 @@ export default class DragUploader {
             if (node.matches('.t3js-drag-uploader')) {
               new DragUploader(node);
             } else {
-              node.querySelectorAll('.t3js-drag-uploader').forEach((element: HTMLElement): void => {
+              node.querySelectorAll<HTMLElement>('.t3js-drag-uploader').forEach((element): void => {
                 new DragUploader(element);
               });
             }
@@ -269,7 +279,7 @@ export default class DragUploader {
     observer.observe(document, { childList: true, subtree: true });
 
     DocumentService.ready().then((): void => {
-      document.querySelectorAll('.t3js-drag-uploader').forEach((element: HTMLElement): void => {
+      document.querySelectorAll<HTMLElement>('.t3js-drag-uploader').forEach((element): void => {
         new DragUploader(element);
       });
     });
@@ -331,6 +341,14 @@ export default class DragUploader {
 
     event.stopPropagation();
     event.preventDefault();
+    const target = event.target instanceof Node ? event.target : null;
+    if (this.dropzoneArea !== null && !this.dropzoneArea.contains(target)) {
+      // Every uploader of the document handles the event, so the drop effect must not depend on the one running last
+      const targetElement = target instanceof Element ? target : target?.parentElement;
+      event.dataTransfer.dropEffect = targetElement?.closest('.dropzone:not([hidden])') ? 'copy' : 'none';
+      this.fileOutOfDropzone();
+      return false;
+    }
     (event.currentTarget as HTMLElement).classList.add('drop-in-progress');
     // Only show dropzone in case $element is currently visible. This prevents
     // use cases, such as opening the dropzone in a non visible tab in FormEngine.
@@ -370,7 +388,7 @@ export default class DragUploader {
   /**
    * @param {FileList} files
    */
-  public processFiles(files: FileList): void {
+  public processFiles(files: FileList | File[]): void {
     const validFiles: File[] = [];
     for (const file of Array.from(files)) {
       const error = this.validateFile(file);
@@ -403,7 +421,7 @@ export default class DragUploader {
 
     // Check for each file if is already exist before adding it to the queue
     const ajaxCalls: Promise<void>[] = [];
-    validFiles.forEach((file: File) => {
+    validFiles.forEach((file) => {
       const request = new AjaxRequest(TYPO3.settings.ajaxUrls.file_exists).withQueryArguments({
         fileName: file.name,
         fileTarget: this.target,
@@ -606,7 +624,7 @@ export default class DragUploader {
           this.askForOverride[index].action = <Action>select.value;
         }
       } else {
-        modal.querySelectorAll('.t3js-actions').forEach((select: HTMLSelectElement) => select.disabled = false);
+        modal.querySelectorAll<HTMLSelectElement>('.t3js-actions').forEach((select) => select.disabled = false);
       }
     }).delegateTo(modal, '.t3js-actions-all');
 
@@ -673,6 +691,30 @@ export default class DragUploader {
       });
     }
     return null;
+  }
+
+  private registerPasteTarget(): void {
+    if (this.element.dataset.uploadOnPaste !== 'field') {
+      FilePasteHandler.register({
+        scope: null,
+        label: '',
+        // A replaced uploader, e.g. of a previously shown folder, must not receive the files
+        isAvailable: (): boolean => this.element.isConnected,
+        receive: (files: File[]): void => this.processFiles(files),
+      });
+      return;
+    }
+    // The dropzone is placed next to the field, their common parent wraps the whole field
+    const scope = this.dropzone.parentElement;
+    FilePasteHandler.register({
+      scope,
+      label: scope.closest('fieldset')?.querySelector(':scope > legend')?.textContent.trim() ?? '',
+      isAvailable: (): boolean => this.element.offsetParent !== null,
+      receive: (files: File[]): void => {
+        scope.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        this.processFiles(files);
+      },
+    });
   }
 }
 

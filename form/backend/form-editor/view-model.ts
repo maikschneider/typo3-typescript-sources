@@ -34,6 +34,7 @@ import type {
   FormElement,
   FormElementDefinition,
   PublisherSubscriber,
+  EditorConfiguration,
 } from '@typo3/form/backend/form-editor/core';
 import type {
   Configuration as HelperConfiguration,
@@ -273,6 +274,66 @@ function addPropertyValidators(): void {
     }
     return undefined;
   });
+
+  getFormEditorApp().addPropertyValidationValidator('ItemCount', function(formElement, propertyPath) {
+    if (getUtility().isUndefinedOrNull(formElement.get(propertyPath))) {
+      return undefined;
+    }
+    const value = formElement.get(propertyPath);
+    const items: Array<string> = value.split(',').filter((str: string) => str !== '');
+
+    const { minItems, maxItems } = resolveItemCountConstraints(formElement, propertyPath);
+
+    if ((minItems > 0 && items.length < minItems) || (maxItems > 1 && items.length > maxItems)) {
+      return getItemCountValidationError(minItems, maxItems);
+    }
+    return undefined;
+  });
+
+  getFormEditorApp().addPropertyValidationValidator('IntegerList', function(formElement, propertyPath) {
+    if (getUtility().isUndefinedOrNull(formElement.get(propertyPath))) {
+      return undefined;
+    }
+    const value = formElement.get(propertyPath);
+    const items: Array<string> = value.split(',').filter((str: string) => str !== '');
+
+    for (const item of items) {
+      if (isNaN(Number(item))) {
+        return getFormEditorApp().getFormElementPropertyValidatorDefinition('IntegerList').errorMessage || 'invalid value';
+      }
+    }
+    return undefined;
+  });
+}
+
+/**
+ * Resolves the `minItems` / `maxItems` constraints of the inspector editor
+ * that is bound to the given property path. Falls back to the framework
+ * defaults (min 0, max 1) when the editor or the options are not defined.
+ */
+function resolveItemCountConstraints(
+  formElement: FormElement,
+  propertyPath: string
+): { minItems: number, maxItems: number } {
+  const editors: Array<EditorConfiguration> = getFormEditorApp().getFormElementDefinition(formElement, 'editors');
+  const editorConfiguration = editors.find((configuration) => configuration.propertyPath === propertyPath);
+
+  return {
+    minItems: editorConfiguration?.minItems ?? 0,
+    maxItems: editorConfiguration?.maxItems ?? 1,
+  };
+}
+
+/**
+ * Builds the localized "ItemCount" error message with the `{0}` / `{1}`
+ * placeholders replaced by the resolved constraints.
+ */
+function getItemCountValidationError(minItems: number, maxItems: number): string {
+  const errorMessage = getFormEditorApp().getFormElementPropertyValidatorDefinition('ItemCount').errorMessage;
+  if (!errorMessage) {
+    return 'invalid value';
+  }
+  return errorMessage.replace('{0}', String(minItems)).replace('{1}', String(maxItems));
 }
 
 /**
@@ -734,9 +795,9 @@ export function renderAbstractStageArea(): void {
 
   const renderPostProcess = (): void => {
     const formElementTypeDefinition = getFormElementDefinition(getCurrentlySelectedFormElement(), undefined);
-    getStage().getAllFormElementDomElements().forEach(function(el: HTMLElement) {
+    getStage().getAllFormElementDomElements().forEach(function(el) {
       el.addEventListener('mouseenter', function() {
-        getStage().getAllFormElementDomElements().forEach((other: HTMLElement) => {
+        getStage().getAllFormElementDomElements().forEach((other) => {
           other.parentElement?.classList.remove(getHelper().getDomElementClassName('sortableHover'));
         });
         if (
@@ -1012,7 +1073,7 @@ export function refreshSelectedElementItemsBatch(): void {
       getStage().createAndAddAbstractViewFormElementToolbar(selectedElement, undefined);
     }
 
-    getStage().getAllFormElementDomElements().forEach((el: HTMLElement) => {
+    getStage().getAllFormElementDomElements().forEach((el) => {
       el.parentElement?.classList.remove(getHelper().getDomElementClassName('selectedCompositFormElement'));
     });
     if (!formElementTypeDefinition._isTopLevelFormElement && formElementTypeDefinition._isCompositeFormElement) {
@@ -1039,9 +1100,9 @@ export function selectPageBatch(pageIndex: number): void {
 }
 
 export function removeAllStageElementSelectionsBatch(): void {
-  getStage().getAllFormElementDomElements().forEach((el: HTMLElement) => el.classList.remove(getHelper().getDomElementClassName('selectedFormElement')));
+  getStage().getAllFormElementDomElements().forEach((el) => el.classList.remove(getHelper().getDomElementClassName('selectedFormElement')));
   removeStagePanelSelection();
-  getStage().getAllFormElementDomElements().forEach((el: HTMLElement) => el.parentElement?.classList.remove(getHelper().getDomElementClassName('sortableHover')));
+  getStage().getAllFormElementDomElements().forEach((el) => el.parentElement?.classList.remove(getHelper().getDomElementClassName('sortableHover')));
 }
 
 export function onViewReadyBatch(): void {
@@ -1076,7 +1137,7 @@ export function onAbstractViewDndChangeBatch(
   parentFormElementIdentifierPath: string,
   enclosingCompositeFormElement?: FormElement | string
 ): void {
-  getStage().getAllFormElementDomElements().forEach((el: HTMLElement) => {
+  getStage().getAllFormElementDomElements().forEach((el) => {
     el.parentElement?.classList.remove(getHelper().getDomElementClassName('sortableHover'));
   });
   if (enclosingCompositeFormElement) {
@@ -1128,7 +1189,7 @@ export function onStructureDndChangeBatch(
 
   getStage()
     .getAllFormElementDomElements()
-    .forEach((el: HTMLElement) => el.parentElement?.classList.remove(getHelper().getDomElementClassName('sortableHover')));
+    .forEach((el) => el.parentElement?.classList.remove(getHelper().getDomElementClassName('sortableHover')));
 
   if (enclosingCompositeFormElement) {
     getStructure()

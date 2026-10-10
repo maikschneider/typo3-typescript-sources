@@ -183,7 +183,9 @@ export class EditablePageTitle extends LitElement {
     if (this.isEditable()) {
       this._isEditing = true;
       await this.updateComplete;
-      this.shadowRoot.querySelector('input')?.focus();
+      const input = this.shadowRoot.querySelector('input');
+      input?.focus();
+      input?.setSelectionRange(input.value.length, input.value.length);
     }
   }
 
