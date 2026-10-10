@@ -2,17 +2,30 @@ name: Sync TYPO3 TypeScript Sources and Publish
 
 on:
   schedule:
-    # Check daily at 2 AM for new tags
+    # Check daily at 2 AM for new tags and new commits on TYPO3 main
     - cron: '0 2 * * *'
   workflow_dispatch:
     inputs:
+      target:
+        description: 'Branch to sync'
+        type: choice
+        options:
+          - all
+          - main
+          - v14.x
+          - v13.x
+        default: all
       tag:
-        description: 'Specific TYPO3 tag (e.g. v14.0.0 or v13.4.0)'
+        description: 'Specific TYPO3 tag for a tagged branch (e.g. v14.3.8); ignored for main'
         required: false
         type: string
 
 permissions:
   contents: read
+
+env:
+  PACKAGE_NAME: typo3-typescript-sources
+  UPSTREAM_REPO: https://github.com/TYPO3/typo3.git
 
 jobs:
   setup:
@@ -20,195 +33,191 @@ jobs:
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
-      - name: Build version matrix
+      - name: Build branch matrix
         id: set-matrix
+        env:
+          TARGET: ${{ inputs.target || 'all' }}
         run: |
-          if [[ "${{ github.event_name }}" == "schedule" ]]; then
-            # Schedule runs daily for both major versions
-            echo 'matrix={"include":[{"major_version":"14","target_branch":"main"},{"major_version":"13","target_branch":"v13.x"}]}' >> $GITHUB_OUTPUT
-          elif [[ "${{ github.ref_name }}" == "v13.x" ]]; then
-            echo 'matrix={"include":[{"major_version":"13","target_branch":"v13.x"}]}' >> $GITHUB_OUTPUT
-          else
-            echo 'matrix={"include":[{"major_version":"14","target_branch":"main"}]}' >> $GITHUB_OUTPUT
-          fi
+          # mode "head": follow an upstream branch, no git tag, no npm release
+          # mode "tag":  follow the newest upstream vMAJOR.x.y tag, tag + publish
+          BRANCHES='[
+            {"target_branch":"main","mode":"head","source_ref":"main","major":"","npm_tag":""},
+            {"target_branch":"v14.x","mode":"tag","source_ref":"","major":"14","npm_tag":"latest"},
+            {"target_branch":"v13.x","mode":"tag","source_ref":"","major":"13","npm_tag":"v13-latest"}
+          ]'
+          MATRIX=$(jq -c --arg t "$TARGET" '{include: [.[] | select($t == "all" or .target_branch == $t)]}' <<< "$BRANCHES")
+          echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
 
-  check-and-sync:
+  sync:
     needs: setup
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    concurrency:
+      group: sync-${{ matrix.target_branch }}
+      cancel-in-progress: false
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.setup.outputs.matrix) }}
+    env:
+      TARGET_BRANCH: ${{ matrix.target_branch }}
+      MODE: ${{ matrix.mode }}
+      MAJOR: ${{ matrix.major }}
+      NPM_TAG: ${{ matrix.npm_tag }}
     steps:
       - name: Checkout split repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
-          ref: ${{ matrix.target_branch }}
-          fetch-depth: 0
-
-      - name: Check for new TYPO3 tags
-        id: check
-        run: |
-          MAJOR="${{ matrix.major_version }}"
-
-          # Fetch all tags from TYPO3 repository for the target major version
-          git ls-remote --tags https://github.com/TYPO3/typo3.git | \
-            grep -E "refs/tags/v${MAJOR}\.[0-9]+\.[0-9]+$" | \
-            sed 's/.*refs\/tags\///' | \
-            sort -V > /tmp/typo3_tags.txt
-
-          # Get last synced tag
-          LAST_SYNCED=""
-          if [ -f .last-synced-tag ]; then
-            LAST_SYNCED=$(cat .last-synced-tag)
-          fi
-
-          # Manual tag input takes priority
-          if [ -n "${{ github.event.inputs.tag }}" ]; then
-            NEW_TAG="${{ github.event.inputs.tag }}"
-            # Validate that the manual tag matches the expected major version
-            if ! echo "$NEW_TAG" | grep -qE "^v${MAJOR}\."; then
-              echo "Error: Tag $NEW_TAG does not match expected major version v${MAJOR}.x for this branch"
-              echo "has_new_version=false" >> $GITHUB_OUTPUT
-              exit 0
-            fi
-            echo "Manually specified tag: $NEW_TAG"
-          else
-            # Find newest tag that has not been synced yet
-            NEW_TAG=$(tail -n1 /tmp/typo3_tags.txt)
-          fi
-
-          if [ -z "$NEW_TAG" ]; then
-            echo "No TYPO3 v${MAJOR}.x tag found"
-            echo "has_new_version=false" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-
-          if [ "$NEW_TAG" = "$LAST_SYNCED" ]; then
-            echo "No new version available (current: $LAST_SYNCED)"
-            echo "has_new_version=false" >> $GITHUB_OUTPUT
-          else
-            echo "New version found: $NEW_TAG (previous: $LAST_SYNCED)"
-            echo "has_new_version=true" >> $GITHUB_OUTPUT
-            echo "typo3_version=$NEW_TAG" >> $GITHUB_OUTPUT
-            echo "release_tag=${NEW_TAG#v}" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Setup Git
-        if: steps.check.outputs.has_new_version == 'true'
-        run: |
-          git config --global user.name "TYPO3 TypeScript Sync Bot"
-          git config --global user.email "bot@maikschneider.de"
-
-      - name: Clone TYPO3 repository at specific tag
-        if: steps.check.outputs.has_new_version == 'true'
-        run: |
-          TYPO3_TAG="${{ steps.check.outputs.typo3_version }}"
-          echo "Cloning TYPO3 repository at tag: $TYPO3_TAG"
-
-          git clone --depth 1 --branch "$TYPO3_TAG" \
-            https://github.com/TYPO3/typo3.git typo3-source
-
-      - name: Extract TypeScript sources
-        if: steps.check.outputs.has_new_version == 'true'
-        run: |
-          mkdir -p typescript-split
-
-          # Copy TypeScript sources
-          if [ -d "typo3-source/Build/Sources/TypeScript" ]; then
-            cp -r typo3-source/Build/Sources/TypeScript/* typescript-split/
-            echo "✓ TypeScript sources extracted"
-          else
-            echo "✗ Error: Build/Sources/TypeScript not found"
-            exit 1
-          fi
-
-          # Copy relevant root files
-          [ -f "typo3-source/LICENSE.txt" ] && cp typo3-source/LICENSE.txt typescript-split/
-          [ -f "typo3-source/README.md" ] && cp typo3-source/README.md typescript-split/README-TYPO3.md
-
-      - name: Checkout split repository for sync
-        if: steps.check.outputs.has_new_version == 'true'
-        uses: actions/checkout@v4
-        with:
-          path: split-repo
           ref: ${{ matrix.target_branch }}
           token: ${{ secrets.PAT_TOKEN }}
           fetch-depth: 0
 
+      - name: Setup Git
+        run: |
+          git config --global user.name "TYPO3 TypeScript Sync Bot"
+          git config --global user.email "bot@maikschneider.de"
+
+      - name: Check upstream for changes
+        id: check
+        env:
+          SOURCE_BRANCH: ${{ matrix.source_ref }}
+          MANUAL_TAG: ${{ inputs.tag }}
+        run: |
+          if [ "$MODE" = "head" ]; then
+            UPSTREAM_SHA=$(git ls-remote "$UPSTREAM_REPO" "refs/heads/${SOURCE_BRANCH}" | cut -f1)
+            if [ -z "$UPSTREAM_SHA" ]; then
+              echo "Error: upstream branch ${SOURCE_BRANCH} not found"
+              exit 1
+            fi
+
+            LAST_SYNCED=$(cat .last-synced-commit 2>/dev/null || true)
+            if [ "$UPSTREAM_SHA" = "$LAST_SYNCED" ]; then
+              echo "No new commits on ${SOURCE_BRANCH} (current: $LAST_SYNCED)"
+              echo "has_changes=false" >> "$GITHUB_OUTPUT"
+            else
+              echo "New commit on ${SOURCE_BRANCH}: $UPSTREAM_SHA (previous: ${LAST_SYNCED:-none})"
+              echo "has_changes=true" >> "$GITHUB_OUTPUT"
+              echo "source_ref=${SOURCE_BRANCH}" >> "$GITHUB_OUTPUT"
+            fi
+            exit 0
+          fi
+
+          if [ -n "$MANUAL_TAG" ]; then
+            if ! echo "$MANUAL_TAG" | grep -qE "^v${MAJOR}\.[0-9]+\.[0-9]+$"; then
+              echo "Tag $MANUAL_TAG does not belong to ${TARGET_BRANCH} (v${MAJOR}.x), skipping sync"
+              echo "has_changes=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            NEW_TAG="$MANUAL_TAG"
+            echo "Manually specified tag: $NEW_TAG"
+          else
+            NEW_TAG=$(git ls-remote --tags "$UPSTREAM_REPO" | \
+              grep -E "refs/tags/v${MAJOR}\.[0-9]+\.[0-9]+$" | \
+              sed 's/.*refs\/tags\///' | \
+              sort -V | tail -n1)
+          fi
+
+          if [ -z "$NEW_TAG" ]; then
+            echo "No TYPO3 v${MAJOR}.x tag found"
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          LAST_SYNCED=$(cat .last-synced-tag 2>/dev/null || true)
+          if [ "$NEW_TAG" = "$LAST_SYNCED" ]; then
+            echo "No new version available (current: $LAST_SYNCED)"
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "New version found: $NEW_TAG (previous: ${LAST_SYNCED:-none})"
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+            echo "source_ref=${NEW_TAG}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Clone TYPO3 repository
+        if: steps.check.outputs.has_changes == 'true'
+        env:
+          SOURCE_REF: ${{ steps.check.outputs.source_ref }}
+        run: |
+          git clone --depth 1 --branch "$SOURCE_REF" "$UPSTREAM_REPO" "$RUNNER_TEMP/typo3-source"
+          if [ ! -d "$RUNNER_TEMP/typo3-source/Build/Sources/TypeScript" ]; then
+            echo "✗ Error: Build/Sources/TypeScript not found"
+            exit 1
+          fi
+
       - name: Sync content to split repository
-        if: steps.check.outputs.has_new_version == 'true'
+        if: steps.check.outputs.has_changes == 'true'
+        id: sync
+        env:
+          SOURCE_REF: ${{ steps.check.outputs.source_ref }}
         run: |
-          # Delete old contents (except .git, .github, package.json)
-          cd split-repo
-          find . -mindepth 1 -maxdepth 1 \
-            ! -name '.git' \
-            ! -name '.github' \
-            ! -name 'package.json' \
-            ! -name 'package-lock.json' \
-            ! -name '.last-synced-tag' \
-            ! -name 'README.md' \
-            ! -name 'node_modules' \
-            -exec rm -rf {} +
+          SRC="$RUNNER_TEMP/typo3-source"
 
-          # Copy new contents
-          cp -r ../typescript-split/* .
+          find . -mindepth 1 -maxdepth 1 ! -name '.git' ! -name '.github' -exec rm -rf {} +
 
-          # Save synced tag
-          echo "${{ steps.check.outputs.typo3_version }}" > .last-synced-tag
+          cp -r "$SRC/Build/Sources/TypeScript/." .
+          [ -f "$SRC/LICENSE.txt" ] && cp "$SRC/LICENSE.txt" .
+          [ -f "$SRC/README.md" ] && cp "$SRC/README.md" README-TYPO3.md
 
-      - name: Create/Update package.json
-        if: steps.check.outputs.has_new_version == 'true'
-        working-directory: split-repo
+          if [ "$MODE" = "head" ]; then
+            SOURCE_SHA=$(git -C "$SRC" rev-parse HEAD)
+            VERSION=$(sed -n "s/.*const VERSION = '\(.*\)';/\1/p" "$SRC/typo3/sysext/core/Classes/Information/Typo3Version.php")
+            if [ -z "$VERSION" ]; then
+              echo "Error: could not read version from Typo3Version.php"
+              exit 1
+            fi
+            echo "$SOURCE_SHA" > .last-synced-commit
+            echo "version_label=${SOURCE_REF}@${SOURCE_SHA:0:12} (${VERSION})" >> "$GITHUB_OUTPUT"
+            echo "source_tree=${SOURCE_SHA}" >> "$GITHUB_OUTPUT"
+          else
+            VERSION="${SOURCE_REF#v}"
+            echo "$SOURCE_REF" > .last-synced-tag
+            echo "version_label=${SOURCE_REF}" >> "$GITHUB_OUTPUT"
+            echo "source_tree=${SOURCE_REF}" >> "$GITHUB_OUTPUT"
+          fi
+
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Create package.json
+        if: steps.check.outputs.has_changes == 'true'
+        env:
+          VERSION: ${{ steps.sync.outputs.version }}
+          SOURCE_TREE: ${{ steps.sync.outputs.source_tree }}
         run: |
-          TYPO3_VERSION="${{ steps.check.outputs.typo3_version }}"
-          # Remove 'v' prefix for npm version
-          NPM_VERSION="${TYPO3_VERSION#v}"
+          # main is installed from git only; "private" guards against an accidental npm publish
+          jq -n \
+            --arg name "$PACKAGE_NAME" \
+            --arg version "$VERSION" \
+            --arg source "$SOURCE_TREE" \
+            --argjson private "$([ "$MODE" = "head" ] && echo true || echo false)" \
+            '{
+              name: $name,
+              version: $version,
+              description: "TYPO3 Core TypeScript Sources - Extracted from TYPO3/typo3 repository",
+              main: "index.js",
+              types: "index.d.ts",
+              scripts: { test: "echo \"No tests specified\"" },
+              repository: { type: "git", url: "git+https://github.com/maikschneider/typo3-typescript-sources.git" },
+              keywords: ["typo3", "typescript", "sources", "cms"],
+              author: "TYPO3 Core Team",
+              license: "GPL-2.0-or-later",
+              bugs: { url: "https://github.com/maikschneider/typo3-typescript-sources/issues" },
+              homepage: "https://github.com/maikschneider/typo3-typescript-sources#readme",
+              publishConfig: { access: "public" },
+              typo3: {
+                sourceRepository: "https://github.com/TYPO3/typo3",
+                sourceTag: $source,
+                sourcePath: "Build/Sources/TypeScript"
+              }
+            } + (if $private then { private: true } else {} end)' > package.json
 
-          cat > package.json << EOF
-          {
-            "name": "typo3-typescript-sources",
-            "version": "${NPM_VERSION}",
-            "description": "TYPO3 Core TypeScript Sources - Extracted from TYPO3/typo3 repository",
-            "main": "index.js",
-            "types": "index.d.ts",
-            "scripts": {
-              "test": "echo \"No tests specified\""
-            },
-            "repository": {
-              "type": "git",
-              "url": "git+https://github.com/maikschneider/typo3-typescript-sources.git"
-            },
-            "keywords": [
-              "typo3",
-              "typescript",
-              "sources",
-              "cms"
-            ],
-            "author": "TYPO3 Core Team",
-            "license": "GPL-2.0-or-later",
-            "bugs": {
-              "url": "https://github.com/maikschneider/typo3-typescript-sources/issues"
-            },
-            "homepage": "https://github.com/maikschneider/typo3-typescript-sources#readme",
-            "publishConfig": {
-              "access": "public"
-            },
-            "typo3": {
-              "sourceRepository": "https://github.com/TYPO3/typo3",
-              "sourceTag": "${TYPO3_VERSION}",
-              "sourcePath": "Build/Sources/TypeScript"
-            }
-          }
-          EOF
-
-          echo "✓ package.json created with version $NPM_VERSION"
+          echo "✓ package.json created with version $VERSION"
 
       - name: Create README
-        if: steps.check.outputs.has_new_version == 'true'
-        working-directory: split-repo
+        if: steps.check.outputs.has_changes == 'true'
+        env:
+          VERSION_LABEL: ${{ steps.sync.outputs.version_label }}
         run: |
-          TYPO3_VERSION="${{ steps.check.outputs.typo3_version }}"
-
           cat > README.md << 'EOF'
           # TYPO3 TypeScript Sources
 
@@ -221,7 +230,14 @@ jobs:
           ## 📦 Installation
 
           ```bash
+          # Current LTS (v14)
           npm install typo3-typescript-sources
+
+          # v13
+          npm install typo3-typescript-sources@v13-latest
+
+          # TYPO3 main (development, not published to npm)
+          npm install github:maikschneider/typo3-typescript-sources#main
           ```
 
           ## 🔍 Source
@@ -232,10 +248,11 @@ jobs:
 
           ## 🌿 Branches
 
-          | Branch   | TYPO3 Version | npm tag   |
-          |----------|---------------|-----------|
-          | `main`   | v14.x         | `latest`  |
-          | `v13.x`  | v13.x         | `v13-latest` |
+          | Branch   | TYPO3 Source         | npm tag      |
+          |----------|----------------------|--------------|
+          | `main`   | `main` (every commit) | –            |
+          | `v14.x`  | v14.x releases       | `latest`     |
+          | `v13.x`  | v13.x releases       | `v13-latest` |
 
           ## 📝 License
 
@@ -251,67 +268,99 @@ jobs:
           For official TYPO3 packages, please refer to the [TYPO3 Core repository](https://github.com/TYPO3/typo3).
           EOF
 
-          # Replace placeholder
-          sed -i "s/TYPO3_VERSION_PLACEHOLDER/${TYPO3_VERSION}/" README.md
+          sed -i "s|TYPO3_VERSION_PLACEHOLDER|${VERSION_LABEL}|" README.md
 
       - name: Commit changes
-        if: steps.check.outputs.has_new_version == 'true'
-        working-directory: split-repo
+        if: steps.check.outputs.has_changes == 'true'
+        id: commit
+        env:
+          VERSION: ${{ steps.sync.outputs.version }}
+          VERSION_LABEL: ${{ steps.sync.outputs.version_label }}
+          SOURCE_TREE: ${{ steps.sync.outputs.source_tree }}
         run: |
-          TARGET_BRANCH="${{ matrix.target_branch }}"
-          git add .
+          git add -A
 
           if git diff --staged --quiet; then
             echo "No changes to commit"
+            echo "committed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          TYPO3_VERSION="${{ steps.check.outputs.typo3_version }}"
-          git commit -m "Sync with TYPO3 ${TYPO3_VERSION}
-
-          Source: https://github.com/TYPO3/typo3/tree/${TYPO3_VERSION}
+          git commit -m "Sync with TYPO3 ${VERSION_LABEL}" \
+            -m "Source: https://github.com/TYPO3/typo3/tree/${SOURCE_TREE}
           Path: Build/Sources/TypeScript/"
 
-          RELEASE_TAG="${{ steps.check.outputs.release_tag }}"
-          git tag -a "${RELEASE_TAG}" -m "Release ${RELEASE_TAG} from TYPO3 ${TYPO3_VERSION}"
+          if [ "$MODE" = "tag" ]; then
+            git tag -a "${VERSION}" -m "Release ${VERSION} from TYPO3 ${VERSION_LABEL}"
+          fi
 
-          git push origin "${TARGET_BRANCH}"
-          git push origin "${RELEASE_TAG}"
+          echo "committed=true" >> "$GITHUB_OUTPUT"
 
       - name: Setup Node.js
-        if: steps.check.outputs.has_new_version == 'true'
-        uses: actions/setup-node@v4
+        if: matrix.mode == 'tag'
+        uses: actions/setup-node@v6
         with:
-          node-version: '20'
-          registry-url: 'https://registry.npmjs.org'
+          node-version: '24'
 
-      - name: Publish to npm
-        if: steps.check.outputs.has_new_version == 'true'
-        working-directory: split-repo
+      - name: Publish unpublished versions to npm
+        if: matrix.mode == 'tag'
+        id: publish
         run: |
-          echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}" > ~/.npmrc
+          # Trusted publishing (OIDC) needs npm >= 11.5.1
+          npm install -g npm@^11.5.1
 
-          MAJOR="${{ matrix.major_version }}"
-          if [ "$MAJOR" = "13" ]; then
-            npm publish --access public --tag v13-latest
-          else
-            npm publish --access public
+          PUBLISHED=$(npm view "$PACKAGE_NAME" versions --json 2>/dev/null || echo '[]')
+
+          # Ascending order, so the dist-tag ends on the newest version
+          PUBLISHED_NOW=""
+          for VERSION in $(git tag -l | grep -E "^${MAJOR}\.[0-9]+\.[0-9]+$" | sort -V); do
+            if jq -e --arg v "$VERSION" '[.] | flatten | index($v) != null' <<< "$PUBLISHED" > /dev/null; then
+              continue
+            fi
+
+            echo "Publishing ${VERSION} with dist-tag ${NPM_TAG}"
+            DIR="$RUNNER_TEMP/publish-${VERSION}"
+            git worktree add --detach "$DIR" "$VERSION"
+            (cd "$DIR" && npm publish --access public --tag "$NPM_TAG")
+            git worktree remove --force "$DIR"
+            PUBLISHED_NOW="${PUBLISHED_NOW} ${VERSION}"
+          done
+
+          echo "versions=${PUBLISHED_NOW# }" >> "$GITHUB_OUTPUT"
+
+      - name: Push changes
+        if: steps.commit.outputs.committed == 'true'
+        env:
+          VERSION: ${{ steps.sync.outputs.version }}
+        run: |
+          git push origin "HEAD:${TARGET_BRANCH}"
+          if [ "$MODE" = "tag" ]; then
+            git push origin "refs/tags/${VERSION}"
           fi
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Create GitHub Release
-        if: steps.check.outputs.has_new_version == 'true'
-        uses: actions/create-release@v1
+      - name: Create GitHub releases
+        if: matrix.mode == 'tag' && steps.publish.outputs.versions != ''
         env:
-          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
-        with:
-          tag_name: ${{ steps.check.outputs.release_tag }}
-          release_name: TYPO3 ${{ steps.check.outputs.release_tag }}
-          body: |
-            Synchronized with TYPO3 Core ${{ steps.check.outputs.typo3_version }}
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+          VERSIONS: ${{ steps.publish.outputs.versions }}
+        run: |
+          NEWEST=$(tr ' ' '\n' <<< "$VERSIONS" | sort -V | tail -n1)
+          for VERSION in $VERSIONS; do
+            if gh release view "$VERSION" > /dev/null 2>&1; then
+              continue
+            fi
 
-            **Source:** https://github.com/TYPO3/typo3/tree/${{ steps.check.outputs.typo3_version }}
-            **Path:** `Build/Sources/TypeScript/`
-          draft: false
-          prerelease: false
+            LATEST=false
+            if [ "$NPM_TAG" = "latest" ] && [ "$VERSION" = "$NEWEST" ]; then
+              LATEST=true
+            fi
+
+            gh release create "$VERSION" \
+              --verify-tag \
+              --title "TYPO3 ${VERSION}" \
+              --latest="$LATEST" \
+              --notes "Synchronized with TYPO3 Core v${VERSION}
+
+          **Source:** https://github.com/TYPO3/typo3/tree/v${VERSION}
+          **Path:** \`Build/Sources/TypeScript/\`"
+          done
