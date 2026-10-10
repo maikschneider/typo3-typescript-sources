@@ -327,7 +327,7 @@ jobs:
             echo "Publishing ${VERSION} with dist-tag ${NPM_TAG}"
             DIR="$RUNNER_TEMP/publish-${VERSION}"
             git worktree add --detach "$DIR" "$VERSION"
-            (cd "$DIR" && npm publish --access public --tag "$NPM_TAG" --loglevel verbose)
+            (cd "$DIR" && npm publish --access public --tag "$NPM_TAG")
             git worktree remove --force "$DIR"
             PUBLISHED_NOW="${PUBLISHED_NOW} ${VERSION}"
           done
