@@ -23,7 +23,7 @@ npm install github:maikschneider/typo3-typescript-sources#main
 
 - **Original Repository:** [TYPO3/typo3](https://github.com/TYPO3/typo3)
 - **Source Path:** `Build/Sources/TypeScript/`
-- **Current TYPO3 Version:** `main@514eced0ff5d (15.0.0-dev)`
+- **Current TYPO3 Version:** `main@229ff63f0722 (15.0.0-dev)`
 
 ## 🌿 Branches
 
