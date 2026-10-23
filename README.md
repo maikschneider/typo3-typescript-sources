@@ -9,21 +9,29 @@ This repository contains the TypeScript sources from the TYPO3 Core, automatical
 ## 📦 Installation
 
 ```bash
+# Current LTS (v14)
 npm install typo3-typescript-sources
+
+# v13
+npm install typo3-typescript-sources@v13-latest
+
+# TYPO3 main (development, not published to npm)
+npm install github:maikschneider/typo3-typescript-sources#main
 ```
 
 ## 🔍 Source
 
 - **Original Repository:** [TYPO3/typo3](https://github.com/TYPO3/typo3)
 - **Source Path:** `Build/Sources/TypeScript/`
-- **Current TYPO3 Version:** `v13.4.36`
+- **Current TYPO3 Version:** `v13.4.37`
 
 ## 🌿 Branches
 
-| Branch   | TYPO3 Version | npm tag   |
-|----------|---------------|-----------|
-| `main`   | v14.x         | `latest`  |
-| `v13.x`  | v13.x         | `v13-latest` |
+| Branch   | TYPO3 Source         | npm tag      |
+|----------|----------------------|--------------|
+| `main`   | `main` (every commit) | –            |
+| `v14.x`  | v14.x releases       | `latest`     |
+| `v13.x`  | v13.x releases       | `v13-latest` |
 
 ## 📝 License
 
