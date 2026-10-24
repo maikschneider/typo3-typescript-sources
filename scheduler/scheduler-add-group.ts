@@ -33,7 +33,7 @@ class SchedulerAddGroups {
   }
 
   public initialize(): void {
-    const element = document.querySelector(this.selector) as HTMLElement;
+    const element = document.querySelector<HTMLElement>(this.selector);
     if(element) {
       element.addEventListener('click', (button: MouseEvent) => {
         button.preventDefault();
@@ -96,10 +96,10 @@ class SchedulerAddGroups {
       }).catch(() => {
         Notification.error(labels.get('msg.group.notification.error.title'), labels.get('msg.group.notification.error.message') + ' "' + name + '"!');
       }).finally(() => {
-        const select = (document as Document).querySelector('#task_group');
+        const select = document.querySelector('#task_group');
         if(select) {
           // This is an ugly hack to pre-select the created group.
-          const form = ((document as Document).forms[0] as HTMLFormElement);
+          const form = document.forms[0];
           const selectLatestGroup: HTMLInputElement = form.querySelector('[name="tx_scheduler[select_latest_group]"]');
 
           selectLatestGroup.value = '1';

@@ -1071,7 +1071,7 @@ export function renderCollectionElementHeaderEditor(
     }
 
     // Move delete button – search within editorHtml's parent (collectionContainerElementWrapper)
-    const collectionContainerEl = editorHtml.closest(getHelper().getDomElementClassName('collectionElement', true)) as HTMLElement | null;
+    const collectionContainerEl = editorHtml.closest(getHelper().getDomElementClassName('collectionElement', true));
     const removeButtonElement = collectionContainerEl?.querySelector('.formeditor-inspector-element-remove-button');
     if (removeButtonElement) {
       const removeButton = removeButtonElement.querySelector('button');
@@ -1734,7 +1734,7 @@ export function renderPropertyGridEditor(
     ? true
     : editorConfiguration.useLabelAsFallbackValue;
 
-  const propertyGridEditor = editorHtml.querySelector('typo3-form-property-grid-editor') as any;
+  const propertyGridEditor = editorHtml.querySelector<any>('typo3-form-property-grid-editor');
   propertyGridEditor.enableAddRow = editorConfiguration.enableAddRow;
   propertyGridEditor.enableSelection = enableSelection;
   propertyGridEditor.enableMultiSelection = multiSelection;
@@ -1980,8 +1980,24 @@ export function renderCheckboxEditor(
     if (checkboxEl) { checkboxEl.checked = true; }
   }
 
+  // Catch up on values not written by this editor, e.g. from predefinedDefaults
+  if (checkboxEl && !getUtility().isUndefinedOrNull(propertyData)) {
+    writeAdditionalElementPropertyPaths(
+      getCurrentlySelectedFormElement(),
+      editorConfiguration,
+      checkboxEl.checked,
+      !checkboxEl.checked
+    );
+  }
+
   checkboxEl?.addEventListener('change', function(this: HTMLInputElement) {
     getCurrentlySelectedFormElement().set(propertyPath, this.checked);
+    writeAdditionalElementPropertyPaths(
+      getCurrentlySelectedFormElement(),
+      editorConfiguration,
+      this.checked,
+      !this.checked
+    );
   });
 }
 
@@ -2026,7 +2042,7 @@ export function renderTextareaEditor(
 
   const propertyData = getCurrentlySelectedFormElement().get(propertyPath);
 
-  const textarea = editorHtml.querySelector('textarea') as HTMLTextAreaElement;
+  const textarea = editorHtml.querySelector('textarea');
 
   if (!textarea) {
     throw new Error('Textarea element not found in editor HTML');
@@ -2375,7 +2391,7 @@ export function bootstrap(
   customConfiguration?: Configuration
 ): typeof import('./inspector-component') {
   formEditorApp = _formEditorApp;
-  configuration = merge({}, defaultConfiguration, customConfiguration ?? {}) as Configuration;
+  configuration = merge({}, defaultConfiguration, customConfiguration ?? {});
   Helper.bootstrap(formEditorApp);
   return this;
 }

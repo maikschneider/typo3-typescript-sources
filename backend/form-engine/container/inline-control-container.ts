@@ -212,16 +212,16 @@ class InlineControlContainer extends HTMLElement {
 
   public connectedCallback(): void {
     this.ajaxDispatcher = new AjaxDispatcher(this.objectGroup);
-    this.recordsContainer = <HTMLDivElement>this.querySelector(selector`[id="${this.id}_records"]`);
+    this.recordsContainer = this.querySelector<HTMLDivElement>(selector`[id="${this.id}_records"]`);
     this.registerEvents();
   }
 
   private getRecordContainer(objectId: string): HTMLDivElement {
-    return <HTMLDivElement>this.querySelector(selector`[data-object-id="${objectId}"]`);
+    return this.querySelector<HTMLDivElement>(selector`[data-object-id="${objectId}"]`);
   }
 
   private getCollapseContent(objectId: string): HTMLDivElement {
-    return <HTMLDivElement>this.querySelector(selector`[id="${objectId}_fields"]`);
+    return this.querySelector<HTMLDivElement>(selector`[id="${objectId}_fields"]`);
   }
 
   private collapseElement(objectId: string): void {
@@ -325,7 +325,7 @@ class InlineControlContainer extends HTMLElement {
       e.stopImmediatePropagation();
 
       this.changeSortingByButton(
-        (<HTMLDivElement>targetElement.closest('[data-object-id]')).dataset.objectId,
+        (targetElement.closest<HTMLDivElement>('[data-object-id]')).dataset.objectId,
         <SortDirections>targetElement.dataset.direction,
       );
     }).delegateTo(this, Selectors.controlSectionSelector + ' [data-action="sort"]');
@@ -342,7 +342,7 @@ class InlineControlContainer extends HTMLElement {
           objectId += Separators.structureSeparator + targetElement.dataset.recordUid;
         }
 
-        this.importRecord([objectId, (this.querySelector(Selectors.createNewRecordBySelectorSelector) as HTMLInputElement)?.value], targetElement.dataset.recordUid ?? null);
+        this.importRecord([objectId, (this.querySelector<HTMLInputElement>(Selectors.createNewRecordBySelectorSelector))?.value], targetElement.dataset.recordUid ?? null);
       }
     }).delegateTo(this, Selectors.createNewRecordButtonSelector);
   }
@@ -364,7 +364,7 @@ class InlineControlContainer extends HTMLElement {
       e.preventDefault();
       e.stopImmediatePropagation();
 
-      const selector = this.querySelector(Selectors.createNewRecordByPresetSelector) as HTMLSelectElement;
+      const selector = this.querySelector<HTMLSelectElement>(Selectors.createNewRecordByPresetSelector);
       const presetValue = selector?.value;
       if (presetValue === '') {
         return;
@@ -469,11 +469,11 @@ class InlineControlContainer extends HTMLElement {
       e.preventDefault();
       e.stopImmediatePropagation();
 
-      const objectId = (<HTMLDivElement>target.closest('[data-object-id]')).dataset.objectId;
+      const objectId = (target.closest<HTMLDivElement>('[data-object-id]')).dataset.objectId;
       const recordContainer = this.getRecordContainer(objectId);
       const hiddenFieldName = selector`data${recordContainer.dataset.fieldName}[${target.dataset.hiddenField}]`;
-      const hiddenValueCheckBox = <HTMLInputElement>this.querySelector('[data-formengine-input-name="' + hiddenFieldName + '"');
-      const hiddenValueInput = <HTMLInputElement>this.querySelector('[name="' + hiddenFieldName + '"');
+      const hiddenValueCheckBox = this.querySelector<HTMLInputElement>('[data-formengine-input-name="' + hiddenFieldName + '"');
+      const hiddenValueInput = this.querySelector<HTMLInputElement>('[name="' + hiddenFieldName + '"');
 
       if (hiddenValueCheckBox !== null && hiddenValueInput !== null) {
         hiddenValueCheckBox.checked = !hiddenValueCheckBox.checked;
@@ -531,7 +531,7 @@ class InlineControlContainer extends HTMLElement {
       ]);
       modal.addEventListener('button.clicked', (modalEvent: Event): void => {
         if ((<HTMLAnchorElement>modalEvent.target).name === 'yes') {
-          const objectId = (<HTMLDivElement>targetElement.closest('[data-object-id]')).dataset.objectId;
+          const objectId = (targetElement.closest<HTMLDivElement>('[data-object-id]')).dataset.objectId;
           this.deleteRecord(objectId);
         }
 
@@ -581,7 +581,7 @@ class InlineControlContainer extends HTMLElement {
       e.preventDefault();
       e.stopImmediatePropagation();
 
-      const recordContainer = (<HTMLDivElement>targetElement.closest('[data-object-id]'));
+      const recordContainer = (targetElement.closest<HTMLDivElement>('[data-object-id]'));
       if (recordContainer !== null) {
         const objectId = recordContainer.dataset.objectId;
         const objectUid = recordContainer.dataset.objectUid;
@@ -697,7 +697,7 @@ class InlineControlContainer extends HTMLElement {
       return;
     }
 
-    let records = Utility.trimExplode(',', (<HTMLInputElement>formField).value);
+    let records = Utility.trimExplode(',', formField.value);
     if (afterUid) {
       const newRecords = [];
       for (let i = 0; i < records.length; i++) {
@@ -713,7 +713,7 @@ class InlineControlContainer extends HTMLElement {
       records.push(newUid);
     }
 
-    (<HTMLInputElement>formField).value = records.join(',');
+    formField.value = records.join(',');
     FormEngine.markFieldAsChanged(formField);
     formField.dispatchEvent(new Event('change', { bubbles: true, cancelable: true }));
 
@@ -739,12 +739,12 @@ class InlineControlContainer extends HTMLElement {
       return [];
     }
 
-    const records = Utility.trimExplode(',', (<HTMLInputElement>formField).value);
+    const records = Utility.trimExplode(',', formField.value);
     const indexOfRemoveUid = records.indexOf(objectUid);
     if (indexOfRemoveUid > -1) {
       records.splice(indexOfRemoveUid, 1);
 
-      (<HTMLInputElement>formField).value = records.join(',');
+      formField.value = records.join(',');
       FormEngine.markFieldAsChanged(formField);
       formField.dispatchEvent(new Event('change', { bubbles: true, cancelable: true }));
 
@@ -798,7 +798,7 @@ class InlineControlContainer extends HTMLElement {
     const records = Array.from(recordListContainer.querySelectorAll<HTMLElement>(selector`[data-object-parent-group="${this.objectGroup}"][data-placeholder-record="0"]`))
       .map((child) => child.dataset.objectUid);
 
-    (<HTMLInputElement>formField).value = records.join(',');
+    formField.value = records.join(',');
     FormEngine.markFieldAsChanged(formField);
     formField.dispatchEvent(new Event('change', { bubbles: true, cancelable: true }));
 
@@ -875,7 +875,7 @@ class InlineControlContainer extends HTMLElement {
     const formField = this.getFormFieldForElements();
 
     if (formField !== null) {
-      const records = Utility.trimExplode(',', (<HTMLInputElement>formField).value);
+      const records = Utility.trimExplode(',', formField.value);
       for (const recordUid of records) {
         if (recordUid === excludeUid) {
           continue;
@@ -904,7 +904,7 @@ class InlineControlContainer extends HTMLElement {
     if (records.length === 0) {
       const formField = this.getFormFieldForElements();
       if (formField !== null) {
-        records = Utility.trimExplode(',', (<HTMLInputElement>formField).value);
+        records = Utility.trimExplode(',', formField.value);
       }
     }
 
@@ -957,7 +957,7 @@ class InlineControlContainer extends HTMLElement {
       return true;
     }
 
-    const records = Utility.trimExplode(',', (<HTMLInputElement>formField).value);
+    const records = Utility.trimExplode(',', formField.value);
     if (this.max > 0 && records.length >= this.max) {
       return false;
     }
@@ -1013,7 +1013,7 @@ class InlineControlContainer extends HTMLElement {
       return;
     }
 
-    const uniqueValueField = <HTMLSelectElement>recordContainer.querySelector(
+    const uniqueValueField = recordContainer.querySelector<HTMLSelectElement>(
       '[name="data[' + unique.table + '][' + recordContainer.dataset.objectUid + '][' + unique.field + ']"]',
     );
     const values = InlineControlContainer.getValuesFromHashMap(unique.used);
@@ -1036,7 +1036,7 @@ class InlineControlContainer extends HTMLElement {
     if (!this.hasObjectGroupDefinedUniqueConstraints()) {
       return;
     }
-    const selectorElement = <HTMLSelectElement>this.querySelector(
+    const selectorElement = this.querySelector<HTMLSelectElement>(
       selector`[id="${this.objectGroup}_selector"]`,
     );
     const unique: UniqueDefinition = TYPO3.settings.FormEngineInline.unique[this.objectGroup];
@@ -1045,7 +1045,7 @@ class InlineControlContainer extends HTMLElement {
         const formField = this.getFormFieldForElements();
         const recordObjectId = this.objectGroup + Separators.structureSeparator + recordUid;
         const recordContainer = this.getRecordContainer(recordObjectId);
-        let uniqueValueField = <HTMLSelectElement>recordContainer.querySelector(
+        let uniqueValueField = recordContainer.querySelector<HTMLSelectElement>(
           '[name="data[' + unique.table + '][' + recordUid + '][' + unique.field + ']"]',
         );
         const values = InlineControlContainer.getValuesFromHashMap(unique.used);
@@ -1076,9 +1076,9 @@ class InlineControlContainer extends HTMLElement {
         }
         // remove the newly used item from each select-field of the child records
         if (formField !== null && InlineControlContainer.selectOptionValueExists(selectorElement, selectedValue)) {
-          const records = Utility.trimExplode(',', (<HTMLInputElement>formField).value);
+          const records = Utility.trimExplode(',', formField.value);
           for (const record of records) {
-            uniqueValueField = <HTMLSelectElement>this.querySelector(
+            uniqueValueField = this.querySelector<HTMLSelectElement>(
               '[name="data[' + unique.table + '][' + record + '][' + unique.field + ']"]',
             );
             if (uniqueValueField !== null && record !== recordUid) {
@@ -1118,7 +1118,7 @@ class InlineControlContainer extends HTMLElement {
     const oldValue = unique.used[recordUid];
 
     if (unique.selector === 'select') {
-      const selectorElement = <HTMLSelectElement>this.querySelector(
+      const selectorElement = this.querySelector<HTMLSelectElement>(
         selector`[id="${this.objectGroup}_selector"]`,
       );
       InlineControlContainer.removeSelectOptionByValue(selectorElement, srcElement.value);
@@ -1138,7 +1138,7 @@ class InlineControlContainer extends HTMLElement {
     const records = Utility.trimExplode(',', formField.value);
     let uniqueValueField;
     for (const record of records) {
-      uniqueValueField = <HTMLSelectElement>this.querySelector(
+      uniqueValueField = this.querySelector<HTMLSelectElement>(
         '[name="data[' + unique.table + '][' + record + '][' + unique.field + ']"]',
       );
       if (uniqueValueField !== null && uniqueValueField !== srcElement) {
@@ -1163,7 +1163,7 @@ class InlineControlContainer extends HTMLElement {
     const recordObjectId = this.objectGroup + Separators.structureSeparator + recordUid;
     const recordContainer = this.getRecordContainer(recordObjectId);
 
-    const uniqueValueField = <HTMLSelectElement>recordContainer.querySelector(
+    const uniqueValueField = recordContainer.querySelector<HTMLSelectElement>(
       '[name="data[' + unique.table + '][' + recordContainer.dataset.objectUid + '][' + unique.field + ']"]',
     );
     if (unique.type === 'select') {
@@ -1178,7 +1178,7 @@ class InlineControlContainer extends HTMLElement {
 
       if (unique.selector === 'select') {
         if (!isNaN(parseInt(uniqueValue, 10))) {
-          const selectorElement = <HTMLSelectElement>this.querySelector(
+          const selectorElement = this.querySelector<HTMLSelectElement>(
             selector`[id="${this.objectGroup}_selector"]`,
           );
           InlineControlContainer.reAddSelectOption(selectorElement, uniqueValue, unique);
@@ -1198,7 +1198,7 @@ class InlineControlContainer extends HTMLElement {
       let recordObj;
       // walk through all inline records on that level and get the select field
       for (let i = 0; i < records.length; i++) {
-        recordObj = <HTMLSelectElement>this.querySelector(
+        recordObj = this.querySelector<HTMLSelectElement>(
           '[name="data[' + unique.table + '][' + records[i] + '][' + unique.field + ']"]',
         );
         if (recordObj !== null) {

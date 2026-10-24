@@ -146,7 +146,7 @@ export default class DragUploader {
       this.dropZoneInsertBefore = false;
       dropZoneEscapedTarget.after(this.dropzone);
     }
-    this.fileInput = <HTMLInputElement>document.createElement('input');
+    this.fileInput = document.createElement('input');
     this.fileInput.setAttribute('type', 'file');
     this.fileInput.setAttribute('multiple', 'multiple');
     this.fileInput.setAttribute('name', 'files[]');
@@ -623,7 +623,7 @@ export default class DragUploader {
     new RegularEvent('change', (event: Event, target: HTMLSelectElement) => {
       if (target.value !== '') {
         // mass action was selected, apply action to every file
-        for (const select of modal.querySelectorAll('.t3js-actions') as NodeListOf<HTMLSelectElement>) {
+        for (const select of modal.querySelectorAll<HTMLSelectElement>('.t3js-actions')) {
           const index = parseInt(select.dataset.override, 10);
           select.value = target.value;
           select.disabled = true;
@@ -643,7 +643,6 @@ export default class DragUploader {
     modal.addEventListener('button.clicked', (e: Event): void => {
       const button = e.target as HTMLButtonElement;
       if (button.name === 'cancel') {
-        this.askForOverride = [];
         Modal.dismiss();
       } else if (button.name === 'continue') {
         for (const fileInfo of this.askForOverride) {
@@ -652,7 +651,10 @@ export default class DragUploader {
               this.irreObjectUid,
               fileInfo.original,
             );
-          } else if (fileInfo.action !== Action.SKIP) {
+            this.decrementQueueLength();
+          } else if (fileInfo.action === Action.SKIP) {
+            this.decrementQueueLength();
+          } else {
             new FileQueueItem(this, fileInfo.uploaded, fileInfo.action, this.fileList.dataset.mode === Mode.BROWSE ? Mode.BROWSE : Mode.MANAGE);
           }
         }
@@ -662,9 +664,11 @@ export default class DragUploader {
     });
 
     modal.addEventListener('typo3-modal-hidden', () => {
+      // None of the files left, e.g. after cancelling the modal, is uploaded
+      for (let i = 0; i < this.askForOverride.length; i++) {
+        this.decrementQueueLength();
+      }
       this.askForOverride = [];
-
-      document.dispatchEvent(new CustomEvent(uploadFinishedEventName));
     });
   }
 
@@ -850,7 +854,7 @@ class FileQueueItem {
     });
     this.updateMessage(errorText);
     try {
-      const jsonResponse = JSON.parse(response.responseText) as any;
+      const jsonResponse = JSON.parse(response.responseText);
       const messages = jsonResponse.messages as FlashMessage[];
       if (messages && messages.length) {
         for (const flashMessage of messages) {
@@ -893,7 +897,7 @@ class FileQueueItem {
 
       // Enable checkbox, if available
       if (this.selector) {
-        const checkbox: HTMLInputElement = <HTMLInputElement>this.selector.querySelector('input');
+        const checkbox = this.selector.querySelector('input');
         if (checkbox) {
           checkbox.removeAttribute('disabled');
           checkbox.setAttribute('name', 'CBC[_FILE|' + Md5.hash(combinedIdentifier) + ']');
@@ -943,7 +947,7 @@ class FileQueueItem {
    */
   public showFileInfo(fileInfo: UploadedFile): void {
     this.removeProgress();
-    if ((document.querySelector('#filelist-searchterm') as HTMLInputElement)?.value) {
+    if ((document.querySelector<HTMLInputElement>('#filelist-searchterm'))?.value) {
       // When search is active, the PATH column is always present so we add it
       const pathColumn = document.createElement('td');
       pathColumn.textContent = fileInfo.path;

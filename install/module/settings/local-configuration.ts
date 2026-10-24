@@ -103,7 +103,7 @@ class LocalConfiguration extends AbstractInteractableModule {
     new RegularEvent('click', (event: Event, target: HTMLInputElement): void => {
       event.preventDefault();
 
-      const container = target.closest('.t3js-configuration-list') as HTMLElement|null;
+      const container = target.closest<HTMLElement>('.t3js-configuration-list');
       if (container === null) {
         return;
       }
@@ -116,7 +116,7 @@ class LocalConfiguration extends AbstractInteractableModule {
       // Iterate all rows to find empty inputs per row
       const rows = container.querySelectorAll(Identifiers.configurationItem);
       for (const row of rows) {
-        const inputs = row.querySelectorAll('input[type="text"]') as NodeListOf<HTMLInputElement>;
+        const inputs = row.querySelectorAll<HTMLInputElement>('input[type="text"]');
         let arrayKey;
         let arrayValue;
         if (container.dataset.type === 'map') {
@@ -142,12 +142,12 @@ class LocalConfiguration extends AbstractInteractableModule {
         }
       }
 
-      const rowTemplate = (container.querySelector('#' + container.dataset.namespace) as HTMLTemplateElement).content.cloneNode(true) as DocumentFragment;
+      const rowTemplate = (container.querySelector<HTMLTemplateElement>('#' + container.dataset.namespace)).content.cloneNode(true) as DocumentFragment;
       container.querySelector('.configuration-map-item-collection').append(rowTemplate);
 
       const lastRow = querySelectorLast(Identifiers.configurationItem);
       // Focus first input field in inserted item
-      (lastRow.querySelector('input[type="text"]') as HTMLInputElement|null)?.focus();
+      (lastRow.querySelector<HTMLInputElement>('input[type="text"]'))?.focus();
     }).delegateTo(currentModal, Identifiers.createRowTrigger);
   }
 
@@ -220,14 +220,14 @@ class LocalConfiguration extends AbstractInteractableModule {
           // indexed by their main key ("GFX/someKey") so they can later be easily piped into it as JavaScript array.
 
           // The "value[]" portion is always required (for map+list), but "key[]" can be optional (only needed for map)
-          if (element.dataset.path!.includes('/key[]') && element.value !== '') {
-            const itemArrayPath = element.dataset.path!.replace('/key[]', '');
+          if (element.dataset.path.includes('/key[]') && element.value !== '') {
+            const itemArrayPath = element.dataset.path.replace('/key[]', '');
             if (collectedArrayKeys[itemArrayPath] === undefined) {
               collectedArrayKeys[itemArrayPath] = [];
             }
             collectedArrayKeys[itemArrayPath].push(element.value);
-          } else if (element.dataset.path!.includes('/value[]') && element.value !== '') {
-            const itemArrayPath = element.dataset.path!.replace('/value[]', '');
+          } else if (element.dataset.path.includes('/value[]') && element.value !== '') {
+            const itemArrayPath = element.dataset.path.replace('/value[]', '');
             if (collectedArrayValues[itemArrayPath] === undefined) {
               collectedArrayValues[itemArrayPath] = [];
             }

@@ -112,7 +112,7 @@ class CollapseStateSearch {
         return;
       }
 
-      const collapsibleIdentifier = (match.parentElement.querySelector('[data-bs-toggle="collapse"]') as HTMLElement|null)?.dataset.bsTarget;
+      const collapsibleIdentifier = (match.parentElement.querySelector<HTMLElement>('[data-bs-toggle="collapse"]'))?.dataset.bsTarget;
       if (collapsibleIdentifier !== undefined) {
         matchingCollapsibleIds.add(collapsibleIdentifier.substring(1));
       }
@@ -123,7 +123,7 @@ class CollapseStateSearch {
       }
     });
 
-    const allNodes = Array.from(treeContainer.querySelectorAll('.collapse')) as HTMLElement[];
+    const allNodes = Array.from(treeContainer.querySelectorAll('.collapse'));
     for (const node of allNodes) {
       const isExpanded: boolean = node.classList.contains('show');
       const id: string = node.id;

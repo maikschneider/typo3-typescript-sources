@@ -382,7 +382,7 @@ export class ModalElement extends LitElement {
 
   private renderAjaxBody(): TemplateResult {
     if (this.templateResultContent === null) {
-      new AjaxRequest(this.content as string).get()
+      new AjaxRequest(this.content).get()
         .then(async (response: AjaxResponse): Promise<void> => {
           const htmlResponse = await response.raw().text();
           this.templateResultContent = html`${unsafeHTML(htmlResponse)}`;
@@ -905,7 +905,7 @@ class Modal {
               if (triggerElement.dataset.targetForm) {
                 // Submit a possible form in case the trigger has the data-target-form
                 // attribute set to a valid form identifier in the ownerDocument.
-                (triggerElement.ownerDocument.querySelector('form#' + triggerElement.dataset.targetForm) as HTMLFormElement)?.submit();
+                (triggerElement.ownerDocument.querySelector<HTMLFormElement>('form#' + triggerElement.dataset.targetForm))?.submit();
               }
             },
           },
@@ -919,7 +919,7 @@ class Modal {
    * @param {Configuration} configuration
    */
   private generate(configuration: PartialConfiguration): ModalElement {
-    const currentModal = document.createElement('typo3-backend-modal') as ModalElement;
+    const currentModal = document.createElement('typo3-backend-modal');
 
     currentModal.type = configuration.type;
     if (typeof configuration.content === 'string') {

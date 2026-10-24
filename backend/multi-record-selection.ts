@@ -72,7 +72,7 @@ class MultiRecordSelection {
   }
 
   private static getIdentifier(element: HTMLElement): string {
-    return (element.closest('[data-multi-record-selection-identifier]') as HTMLElement)?.dataset.multiRecordSelectionIdentifier || '';
+    return (element.closest<HTMLElement>('[data-multi-record-selection-identifier]'))?.dataset.multiRecordSelectionIdentifier || '';
   }
 
   private static changeCheckboxState(checkbox: HTMLInputElement, check: boolean): void {
@@ -102,7 +102,7 @@ class MultiRecordSelection {
     let actionsToggled: boolean = false;
     const identifiers: Array<string> = [];
     checked.forEach((checkbox) => {
-      (checkbox.closest(MultiRecordSelectionSelectors.elementSelector) as HTMLElement)?.classList.add(MultiRecordSelection.activeClass);
+      (checkbox.closest<HTMLElement>(MultiRecordSelectionSelectors.elementSelector))?.classList.add(MultiRecordSelection.activeClass);
       const identifier: string = MultiRecordSelection.getIdentifier(checkbox);
       if (identifier !== '' && !identifiers.includes(identifier)) {
         identifiers.push(identifier);
@@ -164,7 +164,7 @@ class MultiRecordSelection {
       const checked: NodeListOf<HTMLInputElement> = MultiRecordSelection.getCheckboxes(CheckboxState.checked, identifier);
       for (let i = 0; i < checked.length; i++) {
         // Evaluate each checked element if it contains the specified idField
-        if ((checked[i].closest(MultiRecordSelectionSelectors.elementSelector) as HTMLElement)?.dataset[configuration.idField]) {
+        if (checked[i].closest<HTMLElement>(MultiRecordSelectionSelectors.elementSelector)?.dataset[configuration.idField]) {
           // If a checked element contains the idField, remove the "disabled"
           // state and end the search since the action can be performed.
           action.disabled = false;
