@@ -28,7 +28,7 @@
   },
   "typo3": {
     "sourceRepository": "https://github.com/TYPO3/typo3",
-    "sourceTag": "f1e6a2d60ae88195972f103f851a791a89cea952",
+    "sourceTag": "851e49620ce561831b74f86fc566f63591bb5724",
     "sourcePath": "Build/Sources/TypeScript"
   },
   "private": true
