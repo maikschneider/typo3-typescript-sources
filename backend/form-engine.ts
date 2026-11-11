@@ -724,7 +724,7 @@ export default (function() {
     document.querySelectorAll<HTMLElement>('.t3-form-field-eval-null-checkbox').forEach((el) => {
       // Add disabled class to "t3js-formengine-field-item" if the null checkbox is NOT set,
       // This activates a CSS overlay "disabling" the input field and everything around.
-      const checkbox = el.querySelector('input[type="checkbox"]') as HTMLInputElement;
+      const checkbox = el.querySelector<HTMLInputElement>('input[type="checkbox"]');
       const fieldItem = el.closest('.t3js-formengine-field-item');
       if (!checkbox.checked) {
         fieldItem.classList.add('disabled');
@@ -747,14 +747,14 @@ export default (function() {
    */
   FormEngine.toggleCheckboxField = function(checkbox: HTMLInputElement, triggerFocusWhenChecked: boolean = true): void {
     const item = checkbox.closest('.t3js-formengine-field-item');
-    const placeholder = item.querySelector('.t3js-formengine-placeholder-placeholder') as HTMLElement;
-    const formFieldWrapper = item.querySelector('.t3js-formengine-placeholder-formfield') as HTMLElement;
+    const placeholder = item.querySelector<HTMLElement>('.t3js-formengine-placeholder-placeholder');
+    const formFieldWrapper = item.querySelector<HTMLElement>('.t3js-formengine-placeholder-formfield');
 
     if (checkbox.checked) {
       placeholder.hidden = true;
       formFieldWrapper.hidden = false;
       if (triggerFocusWhenChecked) {
-        (formFieldWrapper.querySelector('input,select,textarea') as HTMLInputElement|HTMLSelectElement|HTMLTextAreaElement)?.focus();
+        (formFieldWrapper.querySelector<HTMLInputElement|HTMLSelectElement|HTMLTextAreaElement>('input,select,textarea'))?.focus();
       }
     } else {
       placeholder.hidden = false;
@@ -770,7 +770,7 @@ export default (function() {
    */
   FormEngine.reinitialize = function(): void {
     // Apply "close" button to all input / datetime fields
-    const clearables = document.querySelectorAll('.t3js-clearable') as NodeListOf<HTMLInputElement>;
+    const clearables = document.querySelectorAll<HTMLInputElement>('.t3js-clearable');
     if (clearables.length > 0) {
       import('@typo3/backend/input/clearable').then(function() {
         clearables.forEach(clearableField => clearableField.clearable());
@@ -789,11 +789,11 @@ export default (function() {
    */
   FormEngine.initializeLocalizationStateSelector = function(): void {
     document.querySelectorAll<HTMLElement>('.t3js-l10n-state-container').forEach((el) => {
-      const input = el.closest('.t3js-formengine-field-item')?.querySelector('[data-formengine-input-name]') as HTMLInputElement|null;
+      const input = el.closest('.t3js-formengine-field-item')?.querySelector<HTMLInputElement>('[data-formengine-input-name]');
       if (input === undefined || input === null) {
         return;
       }
-      const currentState = (el.querySelector('input[type="radio"]:checked') as HTMLInputElement)?.value;
+      const currentState = (el.querySelector<HTMLInputElement>('input[type="radio"]:checked'))?.value;
       if (currentState === undefined) {
         console.warn('The localization state of the field ' + input.dataset.formengineInputName + ' cannot be determined. This smells like a DataHandler bug.');
       }
@@ -824,10 +824,11 @@ export default (function() {
    * Helper function to mark a field as changed.
    */
   FormEngine.markFieldAsChanged = function (field: FormEngineFieldElement): void {
-    field.classList.add('has-change');
-    const fieldLabel = field.closest('.t3js-formengine-palette-field')?.querySelector('.t3js-formengine-label');
+    field.classList.add(FormEngineValidation.changeClass);
+    const fieldLabel = field.closest('.t3js-formengine-palette-field')?.querySelector<HTMLElement>('.t3js-formengine-label');
     if (fieldLabel !== null && fieldLabel !== undefined) {
-      fieldLabel.classList.add('has-change');
+      fieldLabel.classList.add(FormEngineValidation.changeClass);
+      FormEngineValidation.updateLabelTitle(fieldLabel);
     }
   };
 
@@ -1454,7 +1455,7 @@ export default (function() {
 
     // Try to find a matching submit button so the SubmitInterceptor can handle spinner
     // and disable state. If no button exists, fall back to a hidden input to carry the action value.
-    const submitter = document.querySelector(selector`button[name="${name}"][form="${FormEngine.formElement.id}"]`) as HTMLButtonElement | null;
+    const submitter = document.querySelector<HTMLButtonElement>(selector`button[name="${name}"][form="${FormEngine.formElement.id}"]`);
     if (submitter !== null) {
       FormEngine.formElement.requestSubmit(submitter);
     } else {

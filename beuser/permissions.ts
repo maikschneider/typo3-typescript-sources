@@ -73,7 +73,7 @@ class Permissions {
       const data = await response.resolve();
       const parentElement = element.parentElement;
       parentElement.innerHTML = data;
-      const targetElement = parentElement.querySelector('button[data-bits="' + bits + '"]') as HTMLButtonElement;
+      const targetElement = parentElement.querySelector<HTMLButtonElement>('button[data-bits="' + bits + '"]');
       targetElement.focus();
     });
   }
@@ -91,7 +91,7 @@ class Permissions {
       const data = await response.resolve();
       const parentElement = element.parentElement;
       element.outerHTML = data;
-      const targetElement = parentElement.querySelector('button[data-page="' + page + '"]') as HTMLButtonElement;
+      const targetElement = parentElement.querySelector<HTMLButtonElement>('button[data-page="' + page + '"]');
       targetElement.focus();
     });
   }
@@ -107,7 +107,7 @@ class Permissions {
       action: 'change_owner',
       page: page,
       ownerUid: element.dataset.owner,
-      newOwnerUid: (container.getElementsByTagName('select')[0] as HTMLSelectElement).value,
+      newOwnerUid: container.getElementsByTagName('select')[0].value,
     }).then(async (response: AjaxResponse): Promise<void> => {
       // Replace content
       container.outerHTML = await response.resolve();
@@ -189,7 +189,7 @@ class Permissions {
       action: 'change_group',
       page: page,
       groupUid: element.dataset.groupId,
-      newGroupUid: (container.getElementsByTagName('select')[0] as HTMLSelectElement).value,
+      newGroupUid: container.getElementsByTagName('select')[0].value,
     }).then(async (response: AjaxResponse): Promise<void> => {
       // Replace content
       container.outerHTML = await response.resolve();

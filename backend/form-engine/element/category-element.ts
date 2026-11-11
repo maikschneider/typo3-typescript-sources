@@ -14,7 +14,7 @@
 import DocumentService from '@typo3/core/document-service';
 import { selector } from '@typo3/core/literals';
 import { type SelectTree } from './select-tree';
-import { type SelectTreeToolbar } from './select-tree-toolbar';
+import './select-tree-toolbar';
 import '@typo3/backend/element/icon-element';
 import type { TreeNodeInterface } from '@typo3/backend/tree/tree-node';
 
@@ -43,14 +43,14 @@ class CategoryElement extends HTMLElement {
     }
 
     await DocumentService.ready();
-    this.recordField = <HTMLInputElement>this.querySelector(selector`#${this.getAttribute('recordFieldId') || '' as string}`);
-    this.treeWrapper = <HTMLElement>this.querySelector(selector`#${this.getAttribute('treeWrapperId') || '' as string}`);
+    this.recordField = this.querySelector<HTMLInputElement>(selector`#${this.getAttribute('recordFieldId') || '' as string}`);
+    this.treeWrapper = this.querySelector<HTMLElement>(selector`#${this.getAttribute('treeWrapperId') || '' as string}`);
 
     if (!this.recordField || !this.treeWrapper) {
       return;
     }
 
-    this.tree = document.createElement('typo3-backend-form-selecttree') as SelectTree;
+    this.tree = document.createElement('typo3-backend-form-selecttree');
     this.tree.setup = {
       id: this.treeWrapper.id,
       dataUrl: this.generateDataUrl(),
@@ -71,7 +71,7 @@ class CategoryElement extends HTMLElement {
     this.tree.addEventListener('typo3:tree:node-selected', this.selectNode);
     this.tree.addEventListener('tree:initialized', () => {
       if (this.recordField.dataset.treeShowToolbar) {
-        const toolbarElement = document.createElement('typo3-backend-form-selecttree-toolbar') as SelectTreeToolbar;
+        const toolbarElement = document.createElement('typo3-backend-form-selecttree-toolbar');
         toolbarElement.tree = this.tree;
         this.tree.prepend(toolbarElement);
       }

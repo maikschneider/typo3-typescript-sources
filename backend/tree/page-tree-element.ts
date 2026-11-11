@@ -385,6 +385,7 @@ export class PageTreeNavigationComponent extends TreeModuleState(LitElement) {
           @typo3:tree:node-selected=${this.loadContent}
           @typo3:tree:node-context=${this.showContextMenu}
           @typo3:tree:nodes-prepared=${this.selectActiveNodeInLoadedNodes}
+          @typo3:tree:filter-reset=${this.revealActiveNode}
       ></typo3-backend-navigation-component-pagetree-tree>
     `;
   }
@@ -698,7 +699,7 @@ class PageTreeToolbar extends TreeToolbar {
       }
 
       // Refresh the tree if there's an active search
-      const searchInput = this.querySelector('.search-input') as HTMLInputElement;
+      const searchInput = this.querySelector<HTMLInputElement>('.search-input');
       if (searchInput && searchInput.value.trim() !== '') {
         this.refreshTree();
       }
@@ -720,7 +721,7 @@ class PageTreeToolbar extends TreeToolbar {
       }
 
       // Refresh the tree if there's an active search
-      const searchInput = this.querySelector('.search-input') as HTMLInputElement;
+      const searchInput = this.querySelector<HTMLInputElement>('.search-input');
       if (searchInput && searchInput.value.trim() !== '') {
         this.refreshTree();
       }

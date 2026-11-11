@@ -112,6 +112,7 @@ export default class DragUploader {
   private readonly browserCapabilities: { fileReader: boolean; DnD: boolean; Progress: boolean };
   private readonly dropZoneInsertBefore: boolean;
   private queueLength: number;
+  private hasSucceededUpload: boolean = false;
   private readonly defaultAction: Action;
   private manuallyTriggered: boolean;
 
@@ -139,7 +140,7 @@ export default class DragUploader {
       this.dropZoneInsertBefore = false;
       dropZoneEscapedTarget.after(this.dropzone);
     }
-    this.fileInput = <HTMLInputElement>document.createElement('input');
+    this.fileInput = document.createElement('input');
     this.fileInput.setAttribute('type', 'file');
     this.fileInput.setAttribute('multiple', 'multiple');
     this.fileInput.setAttribute('name', 'files[]');
@@ -371,22 +372,25 @@ export default class DragUploader {
   /**
    * @param {FileList} files
    */
-  public processFiles(files: FileList): void {
+  public async processFiles(files: FileList | File[]): Promise<void> {
+    const candidates = Array.from(files);
+    // The files of the picker are gone once it is reset
+    this.fileInput.value = '';
+    const errors = await Promise.all(candidates.map((file: File): Promise<string | null> => this.validateFile(file)));
     const validFiles: File[] = [];
-    for (const file of Array.from(files)) {
-      const error = this.validateFile(file);
-      if (error === null) {
+    candidates.forEach((file: File, index: number): void => {
+      if (errors[index] === null) {
         validFiles.push(file);
       } else {
-        Notification.error(coreLabels.get('file_upload.notUploaded.title'), error);
+        Notification.error(coreLabels.get('file_upload.notUploaded.title'), errors[index]);
       }
-    }
-    this.fileInput.value = '';
+    });
     if (validFiles.length === 0) {
       return;
     }
 
     this.queueLength = validFiles.length;
+    this.hasSucceededUpload = false;
 
     if (this.fileList.parentElement.hasAttribute('hidden')) {
       // Show the filelist (table)
@@ -464,9 +468,12 @@ export default class DragUploader {
   /**
    * Decrements the queue and renders a flash message if queue is empty
    */
-  public decrementQueueLength(messages?: FlashMessage[]): void {
+  public decrementQueueLength(messages?: FlashMessage[], uploadSucceeded: boolean = false): void {
     if (this.queueLength > 0) {
       this.queueLength--;
+      if (uploadSucceeded) {
+        this.hasSucceededUpload = true;
+      }
       if (this.queueLength === 0) {
         document.dispatchEvent(new CustomEvent(uploadFinishedEventName));
 
@@ -477,7 +484,7 @@ export default class DragUploader {
           }
         }
 
-        if (this.reloadUrl) {
+        if (this.reloadUrl && this.hasSucceededUpload) {
           // After 5 seconds (when flash messages have disappeared), provide the user the option to reload the module
           setTimeout(() => {
             Notification.info(
@@ -600,7 +607,7 @@ export default class DragUploader {
     new RegularEvent('change', (event: Event, target: HTMLSelectElement) => {
       if (target.value !== '') {
         // mass action was selected, apply action to every file
-        for (const select of modal.querySelectorAll('.t3js-actions') as NodeListOf<HTMLSelectElement>) {
+        for (const select of modal.querySelectorAll<HTMLSelectElement>('.t3js-actions')) {
           const index = parseInt(select.dataset.override, 10);
           select.value = target.value;
           select.disabled = true;
@@ -620,7 +627,6 @@ export default class DragUploader {
     modal.addEventListener('button.clicked', (e: Event): void => {
       const button = e.target as HTMLButtonElement;
       if (button.name === 'cancel') {
-        this.askForOverride = [];
         Modal.dismiss();
       } else if (button.name === 'continue') {
         for (const fileInfo of this.askForOverride) {
@@ -629,7 +635,10 @@ export default class DragUploader {
               this.irreObjectUid,
               fileInfo.original,
             );
-          } else if (fileInfo.action !== Action.SKIP) {
+            this.decrementQueueLength();
+          } else if (fileInfo.action === Action.SKIP) {
+            this.decrementQueueLength();
+          } else {
             new FileQueueItem(this, fileInfo.uploaded, fileInfo.action, this.fileList.dataset.mode === Mode.BROWSE ? Mode.BROWSE : Mode.MANAGE);
           }
         }
@@ -639,16 +648,23 @@ export default class DragUploader {
     });
 
     modal.addEventListener('typo3-modal-hidden', () => {
+      // None of the files left, e.g. after cancelling the modal, is uploaded
+      for (let i = 0; i < this.askForOverride.length; i++) {
+        this.decrementQueueLength();
+      }
       this.askForOverride = [];
-
-      document.dispatchEvent(new CustomEvent(uploadFinishedEventName));
     });
   }
 
   /**
    * @returns the reason why the file cannot be uploaded, null if it can be uploaded
    */
-  private validateFile(file: File): string | null {
+  private async validateFile(file: File): Promise<string | null> {
+    if (!await this.isReadable(file)) {
+      return coreLabels.get('file_upload.notUploaded.unreadable', {
+        '0': file.name,
+      });
+    }
     const extension = file.name.split('.').pop().toLowerCase();
     if (this.maxFileSize > 0 && file.size > this.maxFileSize) {
       return coreLabels.get('file_upload.maxFileSizeExceeded', {
@@ -674,6 +690,19 @@ export default class DragUploader {
       });
     }
     return null;
+  }
+
+  /**
+   * A folder, e.g. one dropped from the desktop, is handed over as a file, but reading it fails
+   */
+  private async isReadable(file: File): Promise<boolean> {
+    try {
+      // Slicing an empty file reads nothing, so it is read as a whole
+      await (file.size === 0 ? file : file.slice(0, 1)).arrayBuffer();
+      return true;
+    } catch {
+      return false;
+    }
   }
 }
 
@@ -803,7 +832,7 @@ class FileQueueItem {
     });
     this.updateMessage(errorText);
     try {
-      const jsonResponse = JSON.parse(response.responseText) as any;
+      const jsonResponse = JSON.parse(response.responseText);
       const messages = jsonResponse.messages as FlashMessage[];
       if (messages && messages.length) {
         for (const flashMessage of messages) {
@@ -834,7 +863,7 @@ class FileQueueItem {
    */
   public uploadSuccess(data: { upload?: UploadedFile[], messages?: FlashMessage[] }): void {
     if (data.upload) {
-      this.dragUploader.decrementQueueLength(data.messages);
+      this.dragUploader.decrementQueueLength(data.messages, true);
       this.row.setAttribute('data-type', 'file');
       this.row.setAttribute('data-file-uid', String(data.upload[0].uid));
       this.fileName.textContent = data.upload[0].name;
@@ -846,7 +875,7 @@ class FileQueueItem {
 
       // Enable checkbox, if available
       if (this.selector) {
-        const checkbox: HTMLInputElement = <HTMLInputElement>this.selector.querySelector('input');
+        const checkbox = this.selector.querySelector('input');
         if (checkbox) {
           checkbox.removeAttribute('disabled');
           checkbox.setAttribute('name', 'CBC[_FILE|' + Md5.hash(combinedIdentifier) + ']');
@@ -896,7 +925,7 @@ class FileQueueItem {
    */
   public showFileInfo(fileInfo: UploadedFile): void {
     this.removeProgress();
-    if ((document.querySelector('#filelist-searchterm') as HTMLInputElement)?.value) {
+    if ((document.querySelector<HTMLInputElement>('#filelist-searchterm'))?.value) {
       // When search is active, the PATH column is always present so we add it
       const pathColumn = document.createElement('td');
       pathColumn.textContent = fileInfo.path;

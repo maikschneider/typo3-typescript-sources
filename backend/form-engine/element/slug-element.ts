@@ -29,6 +29,7 @@ interface FieldOptions {
   signature: string;
   command: string;
   parentPageId: number;
+  recordType: string;
   includeUidInValues: boolean;
 }
 
@@ -36,6 +37,7 @@ interface Response {
   hasConflicts: boolean;
   manual: string;
   proposal: ProposalModes;
+  previewPath: string;
 }
 
 enum Selectors {
@@ -181,26 +183,26 @@ class SlugElement {
       language: this.options.language,
       fieldName: this.options.fieldName,
       command: this.options.command,
+      recordType: this.options.recordType,
       signature: this.options.signature,
     }).then(async (response: AjaxResponse): Promise<void> => {
       const data: Response = await response.resolve();
-      const visualProposal = '/' + data.proposal.replace(/^\//, '');
       const acceptedProposalField: HTMLElement = this.fullElement.querySelector('.t3js-form-proposal-accepted');
       const differentProposalField: HTMLElement = this.fullElement.querySelector('.t3js-form-proposal-different');
 
       acceptedProposalField.classList.toggle('hidden', data.hasConflicts);
       differentProposalField.classList.toggle('hidden', !data.hasConflicts);
-      (data.hasConflicts ? differentProposalField : acceptedProposalField).querySelector('span').innerText = visualProposal;
+      (data.hasConflicts ? differentProposalField : acceptedProposalField).querySelector('span').innerText = data.previewPath;
 
-      const isChanged = this.hiddenField.value !== data.proposal;
-      if (isChanged) {
-        this.fullElement.querySelector('input[data-formengine-input-name]')
-          .dispatchEvent(new Event('change', { bubbles: true, cancelable: true }));
-      }
       if (mode === ProposalModes.AUTO || mode === ProposalModes.RECREATE) {
+        const isChanged = this.hiddenField.value !== data.proposal || this.inputField.value !== data.proposal;
         this.readOnlyField.value = data.proposal;
         this.hiddenField.value = data.proposal;
         this.inputField.value = data.proposal;
+        if (isChanged) {
+          this.fullElement.querySelector('input[data-formengine-input-name]')
+            .dispatchEvent(new Event('change', { bubbles: true, cancelable: true }));
+        }
       } else {
         this.hiddenField.value = data.proposal;
       }
