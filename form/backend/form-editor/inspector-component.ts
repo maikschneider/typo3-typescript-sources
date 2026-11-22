@@ -114,9 +114,11 @@ const defaultConfiguration: Configuration = {
   isSortable: true
 };
 
-let configuration: Configuration = null;
+let configuration: Configuration | null = null;
 
-let formEditorApp: FormEditor = null;
+let formEditorApp: FormEditor | null = null;
+
+let renderedFormElementIdentifierPath: string | null = null;
 
 function getFormEditorApp(): FormEditor {
   return formEditorApp;
@@ -722,9 +724,17 @@ export function renderEditors(
   }
 
   const inspectorEl = getInspectorDomElement();
+  const scrollContainer = inspectorEl?.closest<HTMLElement>('.formeditor-inspector-inner');
+  const formElementIdentifierPath = typeof formElement === 'string'
+    ? formElement
+    : formElement.get('__identifierPath');
+  const scrollTop = formElementIdentifierPath === renderedFormElementIdentifierPath
+    ? scrollContainer?.scrollTop ?? 0
+    : 0;
+  renderedFormElementIdentifierPath = formElementIdentifierPath;
   if (inspectorEl) { inspectorEl.replaceChildren(); }
 
-  const formElementTypeDefinition = getFormElementDefinition(formElement, undefined);
+  const formElementTypeDefinition = getFormElementDefinition(formElement) as FormElementDefinition;
   if (!Array.isArray(formElementTypeDefinition.editors)) {
     return;
   }
@@ -757,13 +767,16 @@ export function renderEditors(
   if (typeof callback === 'function') {
     callback();
   }
+  if (scrollContainer) {
+    scrollContainer.scrollTop = scrollTop;
+  }
 }
 
 export function renderCollectionElementEditors(
   collectionName: keyof FormEditorDefinitions,
   collectionElementIdentifier: string
 ): void {
-  let collapseWrapper: HTMLElement, collapsePanel: HTMLElement, collectionContainer: HTMLElement | null;
+  let collapseWrapper: HTMLElement | null = null, collapsePanel: HTMLElement | null = null, collectionContainer: HTMLElement | null;
 
   assert(
     getUtility().isNonEmptyString(collectionName),
@@ -1699,7 +1712,7 @@ export function renderPropertyGridEditor(
     const formElement = getCurrentlySelectedFormElement();
     const fullPropertyPath = propertyPathPrefix + editorConfiguration.propertyPath;
     const rawData = formElement.get(fullPropertyPath) || {};
-    let propertyEntries: PropertyGridEditorEntry[];
+    let propertyEntries: PropertyGridEditorEntry[] = [];
 
     if (Array.isArray(rawData)) {
       // Handle array of objects: [{_label, _value}] or raw values
@@ -1762,6 +1775,10 @@ export function renderPropertyGridEditor(
     propertyGridEditor.formElements = getFormElementSelectorEntries();
   }
 
+  // Ensure 'defaultValue' has a registered publisher topic so that
+  // set('defaultValue', ...) fires the 'core/formElement/somePropertyChanged' event.
+  getCurrentlySelectedFormElement().on(propertyPathPrefix + 'defaultValue', 'core/formElement/somePropertyChanged');
+
   propertyGridEditor.addEventListener(PropertyGridEditorUpdateEvent.eventName, (event: PropertyGridEditorUpdateEvent) => {
     const entries = event.data;
     const defaultValues: (string | number)[] = [];
@@ -1786,11 +1803,15 @@ export function renderPropertyGridEditor(
     if (multiSelection) {
       getCurrentlySelectedFormElement().set(propertyPathPrefix + 'defaultValue', defaultValues);
     } else {
-      getCurrentlySelectedFormElement().set(propertyPathPrefix + 'defaultValue', defaultValues[0] ?? '', true);
+      getCurrentlySelectedFormElement().set(propertyPathPrefix + 'defaultValue', defaultValues[0] ?? '');
     }
 
-    getCurrentlySelectedFormElement().set(propertyPathPrefix + editorConfiguration.propertyPath, newData);
-    validateCollectionElement(propertyPathPrefix + editorConfiguration.propertyPath, editorHtml);
+    const optionsPropertyPath = propertyPathPrefix + editorConfiguration.propertyPath;
+    const oldData = getCurrentlySelectedFormElement().get(optionsPropertyPath);
+    if (JSON.stringify(oldData) !== JSON.stringify(newData)) {
+      getCurrentlySelectedFormElement().set(optionsPropertyPath, newData);
+    }
+    validateCollectionElement(optionsPropertyPath, editorHtml);
   });
 
   validateCollectionElement(propertyPathPrefix + editorConfiguration.propertyPath, editorHtml);
@@ -2137,7 +2158,7 @@ export function renderTypo3WinBrowserEditor(
   renderDescription(editorConfiguration, editorHtml);
 
   const formEl = editorHtml.querySelector('form');
-  if (formEl) { formEl.name = editorConfiguration.propertyPath; }
+  if (formEl) { formEl.name = editorConfiguration.propertyPath ?? ''; }
 
   Icons.getIcon(editorConfiguration.iconIdentifier, Icons.sizes.small).then(function(icon) {
     const imageEl = getHelper().getTemplatePropertyElement('image', editorHtml);
@@ -2391,6 +2412,7 @@ export function bootstrap(
   customConfiguration?: Configuration
 ): typeof import('./inspector-component') {
   formEditorApp = _formEditorApp;
+  renderedFormElementIdentifierPath = null;
   configuration = merge({}, defaultConfiguration, customConfiguration ?? {});
   Helper.bootstrap(formEditorApp);
   return this;
