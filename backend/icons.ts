@@ -177,7 +177,7 @@ class Icons {
       || ClientStorage.get('icon_registry_cache_identifier') !== registryCacheIdentifier
     ) {
       ClientStorage.unsetByPrefix('icon_');
-      ClientStorage.set('icon_registry_cache_identifier', registryCacheIdentifier);
+      ClientStorage.set('icon_registry_cache_identifier', registryCacheIdentifier!);
     }
 
     try {
@@ -190,7 +190,7 @@ class Icons {
   /**
    * Performs the AJAX request to fetch the icon
    */
-  private fetchFromRemote(icon: Array<string>, cacheIdentifier: string, signal?: AbortSignal | null): Promise<string> {
+  private fetchFromRemote(icon: Array<string | null | undefined>, cacheIdentifier: string, signal?: AbortSignal | null): Promise<string> {
     return this.promiseCache.get(
       cacheIdentifier,
       async (signal: AbortSignal): Promise<string> => {
@@ -218,19 +218,16 @@ class Icons {
    */
   private fetchFromLocal(cacheIdentifier: string): Promise<string> {
     if (ClientStorage.isset('icon_' + cacheIdentifier)) {
-      return Promise.resolve(ClientStorage.get('icon_' + cacheIdentifier));
+      return Promise.resolve(ClientStorage.get('icon_' + cacheIdentifier)!);
     }
 
     return Promise.reject();
   }
 }
 
-let iconsObject: Icons;
-if (!iconsObject) {
-  iconsObject = new Icons();
-  if (typeof TYPO3 !== 'undefined') {
-    TYPO3.Icons = iconsObject;
-  }
+const iconsObject: Icons = new Icons();
+if (typeof TYPO3 !== 'undefined') {
+  TYPO3.Icons = iconsObject;
 }
 
 export default iconsObject;

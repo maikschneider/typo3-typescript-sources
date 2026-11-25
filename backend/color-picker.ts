@@ -88,9 +88,9 @@ export class Typo3BackendColorPicker extends LitElement {
       swatches: this.swatches,
       preset: false,
       color: this.color,
-      // Casting to `unknown` to prevent TypeScript Error
+      // Cast away to prevent TypeScript Error
       // > TS2589: Type instantiation is excessively deep and possibly infinite.
-      parent: (this.closest('dialog') ?? '') as unknown,
+      parent: (this.closest('dialog') ?? '') as never,
     });
 
     // When the color picker opens, the input loses focus, making value changes difficult.
@@ -151,9 +151,9 @@ class LegacyColorPicker {
     }
 
     const colorPicker = document.createElement('typo3-backend-color-picker');
-    colorPicker.swatches = options.swatches.map((swatch) => ({ color: swatch, label: swatch }));
+    colorPicker.swatches = options.swatches!.map((swatch) => ({ color: swatch, label: swatch }));
     colorPicker.opacity = options.opacity ?? false;
-    element.parentNode.insertBefore(colorPicker, element);
+    element.parentNode!.insertBefore(colorPicker, element);
     colorPicker.appendChild(element);
   }
 }

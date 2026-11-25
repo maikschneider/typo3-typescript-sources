@@ -101,8 +101,8 @@ export class ContentRecordSelectionStep implements WizardStepInterface, WizardSt
                        this.task.status === TaskStatus.INITIAL;
 
     if (shouldRun) {
-      this.lastTargetLanguage = currentTargetLanguage;
-      this.lastSourceLanguage = currentSourceLanguage;
+      this.lastTargetLanguage = currentTargetLanguage!;
+      this.lastSourceLanguage = currentSourceLanguage!;
       this.hasDispatchedAutoAdvance = false; // Reset flag when task runs
       this.hasUserInteracted = false; // Reset interaction flag when task runs
       this.task.run();
@@ -166,6 +166,7 @@ export class ContentRecordSelectionStep implements WizardStepInterface, WizardSt
         `;
       },
       error: (error: unknown) => this.context.wizard.renderError(localizationWizardLabels.get('step.content_selection.error.message'), error),
+      initial: () => this.context.wizard.renderLoader(),
       pending: () => this.context.wizard.renderLoader()
     });
   }

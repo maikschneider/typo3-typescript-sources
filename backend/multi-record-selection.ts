@@ -329,7 +329,7 @@ class MultiRecordSelection {
         // Only change checkbox state if the target is the row itself
         return;
       }
-      const checkbox = target.querySelector<HTMLInputElement>(MultiRecordSelectionSelectors.checkboxSelector);
+      const checkbox = target.querySelector<HTMLInputElement>(MultiRecordSelectionSelectors.checkboxSelector)!;
       if (checkbox === null) {
         // Return in case the table row does not contain a checkbox, handled by this component
         return;
@@ -345,7 +345,11 @@ class MultiRecordSelection {
     }).delegateTo(document, MultiRecordSelectionSelectors.elementSelector);
 
     // In case row selection is enabled and a keyboard "shortcut" is used, prevent text selection on the rows
-    new RegularEvent('mousedown', (e: PointerEvent): void => (e.shiftKey || e.altKey || e.ctrlKey) && e.preventDefault())
+    new RegularEvent('mousedown', (e: PointerEvent): void => {
+      if (e.shiftKey || e.altKey || e.ctrlKey) {
+        e.preventDefault();
+      }
+    })
       .delegateTo(document, MultiRecordSelectionSelectors.elementSelector);
   }
 
@@ -363,9 +367,9 @@ class MultiRecordSelection {
       const identifier: string = e.detail?.identifier || '';
 
       if (checkbox.checked) {
-        checkbox.closest(MultiRecordSelectionSelectors.elementSelector).classList.add(MultiRecordSelection.activeClass);
+        checkbox.closest(MultiRecordSelectionSelectors.elementSelector)!.classList.add(MultiRecordSelection.activeClass);
       } else {
-        checkbox.closest(MultiRecordSelectionSelectors.elementSelector).classList.remove(MultiRecordSelection.activeClass);
+        checkbox.closest(MultiRecordSelectionSelectors.elementSelector)!.classList.remove(MultiRecordSelection.activeClass);
       }
 
       // Toggle actions for changed checkbox state
@@ -377,7 +381,7 @@ class MultiRecordSelection {
     new RegularEvent('click', (e: Event, target: HTMLButtonElement): void => {
       const identifier: string = MultiRecordSelection.getIdentifier(target);
 
-      const checkAll: HTMLButtonElement = document.querySelector([
+      const checkAll: HTMLButtonElement | null = document.querySelector([
         MultiRecordSelection.getCombinedSelector(MultiRecordSelectionSelectors.checkboxActionsSelector, identifier),
         'button[data-multi-record-selection-check-action="' + CheckboxActions.checkAll + '"]'
       ].join(' '));
@@ -386,7 +390,7 @@ class MultiRecordSelection {
         checkAll.disabled = !MultiRecordSelection.getCheckboxes(CheckboxState.unchecked, identifier).length;
       }
 
-      const checkNone: HTMLButtonElement = document.querySelector([
+      const checkNone: HTMLButtonElement | null = document.querySelector([
         MultiRecordSelection.getCombinedSelector(MultiRecordSelectionSelectors.checkboxActionsSelector, identifier),
         'button[data-multi-record-selection-check-action="' + CheckboxActions.checkNone + '"]'
       ].join(' '));
@@ -395,7 +399,7 @@ class MultiRecordSelection {
         checkNone.disabled = !MultiRecordSelection.getCheckboxes(CheckboxState.checked, identifier).length;
       }
 
-      const toggle: HTMLButtonElement = document.querySelector([
+      const toggle: HTMLButtonElement | null = document.querySelector([
         MultiRecordSelection.getCombinedSelector(MultiRecordSelectionSelectors.checkboxActionsSelector, identifier),
         'button[data-multi-record-selection-check-action="' + CheckboxActions.toggle + '"]'
       ].join(' '));

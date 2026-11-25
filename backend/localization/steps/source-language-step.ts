@@ -27,7 +27,7 @@ export class SourceLanguageStep implements WizardStepInterface, WizardStepValueI
   readonly title = localizationWizardLabels.get('step.source_language.title');
   readonly autoAdvance = true;
 
-  private readonly task: Task<[string, number, number | null], LocalizationLanguageRecord[]>;
+  private readonly task: Task<readonly [string, number, number | undefined], LocalizationLanguageRecord[]>;
   private hasDispatchedAutoAdvance: boolean = false;
   private selectedLanguage: number | null = null;
 
@@ -133,6 +133,7 @@ export class SourceLanguageStep implements WizardStepInterface, WizardStepValueI
         `;
       },
       error: (error: unknown) => this.context.wizard.renderError(localizationWizardLabels.get('step.source_language.error.message'), error),
+      initial: () => this.context.wizard.renderLoader(),
       pending: () => this.context.wizard.renderLoader()
     });
   }
@@ -151,7 +152,7 @@ export class SourceLanguageStep implements WizardStepInterface, WizardStepValueI
   }
 
   public beforeAdvance(): void {
-    this.context.setStoreData('sourceLanguage', this.getValue());
+    this.context.setStoreData('sourceLanguage', this.getValue()!);
   }
 
   public getSummaryData(): SummaryItem[] {

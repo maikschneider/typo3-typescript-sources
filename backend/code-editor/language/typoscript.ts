@@ -7,7 +7,7 @@ import type { CompletionContext, CompletionResult } from '@codemirror/autocomple
 import type { SyntaxNodeRef } from '@lezer/common';
 
 interface Token {
-  type: string;
+  type: string | null;
   string: string;
   start: number;
   end: number;
@@ -47,7 +47,7 @@ export function typoscript() {
 
 const tsCodeCompletionInitializer = (async (): Promise<TsCodeCompletion> => {
   await DocumentService.ready();
-  const effectivePid = parseInt((document.querySelector<HTMLInputElement>('input[name="effectivePid"]'))?.value, 10);
+  const effectivePid = parseInt(document.querySelector<HTMLInputElement>('input[name="effectivePid"]')?.value ?? '', 10);
   return new TsCodeCompletion(effectivePid);
 })();
 

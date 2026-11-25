@@ -23,29 +23,29 @@ import { topWindow } from '@typo3/core/utility/top-window';
  * sheet, ask about unsaved changes first.
  */
 class EditFormControl {
-  private controlElement: HTMLAnchorElement = null;
-  private assignedFormField: HTMLSelectElement = null;
+  private controlElement: HTMLAnchorElement | null = null;
+  private assignedFormField: HTMLSelectElement | null = null;
 
   constructor(controlElementId: string) {
     DocumentService.ready().then((): void => {
       this.controlElement = document.querySelector<HTMLAnchorElement>(controlElementId);
       this.assignedFormField = document.querySelector<HTMLSelectElement>(
-        'select[data-formengine-input-name="' + this.controlElement.dataset.element + '"]',
+        'select[data-formengine-input-name="' + this.controlElement!.dataset.element + '"]',
       );
       this.assignedFormField?.addEventListener('change', this.updateState);
-      this.controlElement.addEventListener('click', this.openFormEditor);
+      this.controlElement!.addEventListener('click', this.openFormEditor);
       this.updateState();
     });
   }
 
   private isSelectionRendered(): boolean {
-    return this.assignedFormField?.value === this.controlElement.dataset.persistenceIdentifier;
+    return this.assignedFormField?.value === this.controlElement!.dataset.persistenceIdentifier;
   }
 
   private readonly updateState = (): void => {
     const disabled = !this.isSelectionRendered();
-    this.controlElement.classList.toggle('disabled', disabled);
-    this.controlElement.setAttribute('aria-disabled', disabled ? 'true' : 'false');
+    this.controlElement!.classList.toggle('disabled', disabled);
+    this.controlElement!.setAttribute('aria-disabled', disabled ? 'true' : 'false');
   };
 
   private readonly openFormEditor = (e: Event): void => {
@@ -53,7 +53,7 @@ class EditFormControl {
     if (!this.isSelectionRendered()) {
       return;
     }
-    topWindow.TYPO3?.Backend?.ContentContainer?.setUrl(this.controlElement.href);
+    topWindow.TYPO3?.Backend?.ContentContainer?.setUrl(this.controlElement!.href);
   };
 }
 

@@ -144,6 +144,7 @@ export class TargetLanguageStep implements WizardStepInterface, WizardStepValueI
         `;
       },
       error: (error: unknown) => this.context.wizard.renderError(localizationWizardLabels.get('step.target_language.error.message'), error),
+      initial: () => this.context.wizard.renderLoader(),
       pending: () => this.context.wizard.renderLoader()
     });
   }
@@ -162,7 +163,7 @@ export class TargetLanguageStep implements WizardStepInterface, WizardStepValueI
   }
 
   public beforeAdvance(): void {
-    this.context.setStoreData('targetLanguage', this.getValue());
+    this.context.setStoreData('targetLanguage', this.getValue()!);
   }
 
   public getSummaryData(): SummaryItem[] {

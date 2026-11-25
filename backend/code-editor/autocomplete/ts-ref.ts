@@ -33,11 +33,11 @@ export class TsRefType {
 
   constructor(
     typeId: string,
-    extendsTypeId: string | null,
+    extendsTypeId: string | null | undefined,
     properties: Record<PropertyName, TsRefProperty>
   ) {
     this.typeId = typeId;
-    this.extends = extendsTypeId;
+    this.extends = extendsTypeId!;
     this.properties = properties;
   }
 }
@@ -72,8 +72,8 @@ export class TsRef {
    * Build the TypoScript reference tree
    */
   public buildTree(): void {
-    for (const typeId of Object.keys(this.doc)) {
-      const arr = this.doc[typeId];
+    for (const typeId of Object.keys(this.doc!)) {
+      const arr = this.doc![typeId];
       this.typeTree[typeId] = new TsRefType(
         typeId,
         arr.extends || undefined,

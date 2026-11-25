@@ -84,13 +84,13 @@ export class AjaxDispatcher {
     return body;
   }
 
-  private getContext(): Context {
-    let context: Context;
+  private getContext(): Context | undefined {
+    let context: Context | undefined;
 
-    if (typeof TYPO3.settings.FormEngineInline.config[this.objectGroup] !== 'undefined'
-      && typeof TYPO3.settings.FormEngineInline.config[this.objectGroup].context !== 'undefined'
+    if (typeof TYPO3.settings.FormEngineInline.config[this.objectGroup!] !== 'undefined'
+      && typeof TYPO3.settings.FormEngineInline.config[this.objectGroup!].context !== 'undefined'
     ) {
-      context = TYPO3.settings.FormEngineInline.config[this.objectGroup].context;
+      context = TYPO3.settings.FormEngineInline.config[this.objectGroup!].context;
     }
 
     return context;
@@ -104,7 +104,7 @@ export class AjaxDispatcher {
     }
 
     if (json.stylesheetFiles) {
-      document.querySelector('head').append(
+      document.querySelector('head')!.append(
         ...json.stylesheetFiles.filter(file => file).map(file => {
           const element = document.createElement('link');
           element.rel = 'stylesheet';

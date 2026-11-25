@@ -197,13 +197,13 @@ export class EditableSettingElement extends LitElement {
   }
 
   protected async copyAsYaml(): Promise<void> {
-    const formData = new FormData(this.typeElement.form);
+    const formData = new FormData(this.typeElement!.form!);
     const name = `settings[${this.setting.definition.key}]`;
     const value = formData.get(name);
 
     const data = new FormData();
     data.append('specificSetting', this.setting.definition.key);
-    data.append(name, value);
+    data.append(name, String(value));
 
     // @todo hookup with ProgressBar
     const response = await new AjaxRequest(this.dumpuri).post(

@@ -78,7 +78,7 @@ export class Wizard<TDataStore extends DataStore = DataStore> extends LitElement
   }
 
   public getStoreData<T extends keyof TDataStore>(key: T): NoInfer<TDataStore[T]> {
-    return this.dataStore[key] ?? null;
+    return this.dataStore[key];
   }
 
   public setStoreData<T extends keyof TDataStore>(key: T, value: NoInfer<TDataStore[T]>): void {
@@ -184,7 +184,7 @@ export class Wizard<TDataStore extends DataStore = DataStore> extends LitElement
         new FinisherStep(this, this.submissionService),
       ];
 
-      this.progressTracker.requestUpdate();
+      this.progressTracker!.requestUpdate();
       if (!this.currentStep) {
         this.currentStep = this.allSteps[this.currentStepIndex];
       }

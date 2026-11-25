@@ -33,7 +33,6 @@ import type TriggerRequest from '@typo3/backend/event/trigger-request';
 import Utility from '@typo3/backend/utility';
 import { selector } from '@typo3/core/literals';
 import '@typo3/backend/form-engine/element/extra/char-counter';
-import type { PromiseControls } from '@typo3/backend/event/interaction-request-assignment';
 import Hotkeys, { ModifierKeys } from '@typo3/backend/hotkeys';
 import RegularEvent from '@typo3/core/event/regular-event';
 import backendAltDocLabels from '~labels/backend.alt_doc';
@@ -156,7 +155,7 @@ export default (function() {
   });
 
   let formEngineIsReady: boolean = false;
-  let formEngineReadyPromise: Promise<void> = null;
+  let formEngineReadyPromise: Promise<void> | null = null;
 
   /**
    * @exports @typo3/backend/form-engine
@@ -166,7 +165,7 @@ export default (function() {
     Validation: FormEngineValidation,
     interactionRequestMap: InteractionRequestMap,
     formName: 'editform',
-    formElement: undefined,
+    formElement: undefined as unknown as HTMLFormElement,
     openedPopupWindow: null,
     browserUrl: '',
   };
@@ -290,7 +289,7 @@ export default (function() {
 
       // If multiple values are not allowed, clear anything that is in the control already
       if (!isMultiple) {
-        for (const el of fieldEl.querySelectorAll('option')) {
+        for (const el of fieldEl!.querySelectorAll('option')) {
           const option: HTMLOptionElement | null = availableFieldEl.querySelector(selector`option[value="${el.value}"]`);
           if (option !== null) {
             option.classList.remove('hidden');
@@ -298,26 +297,26 @@ export default (function() {
             FormEngine.enableOptGroup(option);
           }
         }
-        fieldEl.replaceChildren();
+        fieldEl!.replaceChildren();
       }
 
       // Clear elements if exclusive values are found
       if (exclusiveValues.length > 0) {
         let reenableOptions = false;
 
-        const currentOptions = fieldEl.querySelectorAll('option');
+        const currentOptions = fieldEl!.querySelectorAll('option');
         if (exclusiveValues.includes(value)) {
           // the new value is exclusive => remove all existing values
-          fieldEl.replaceChildren();
+          fieldEl!.replaceChildren();
           reenableOptions = true;
         } else if (currentOptions.length === 1 && exclusiveValues.includes(currentOptions[0].value)) {
           // there is an old value, and it was exclusive => it has to be removed
-          fieldEl.replaceChildren();
+          fieldEl!.replaceChildren();
           reenableOptions = true;
         }
 
         if (reenableOptions && typeof optionEl !== 'undefined') {
-          optionEl.closest('select').querySelectorAll<HTMLOptionElement>('[disabled]').forEach(function (disabledOption) {
+          optionEl.closest('select')!.querySelectorAll<HTMLOptionElement>('[disabled]').forEach(function (disabledOption) {
             disabledOption.classList.remove('hidden');
             disabledOption.disabled = false;
             FormEngine.enableOptGroup(disabledOption);
@@ -331,7 +330,7 @@ export default (function() {
       // check if there is a "_mul" field (a field on the right) and if the field was already added
       const multipleFieldEl = FormEngine.getFieldElement(fieldName, '_mul', true) as HTMLInputElement | null;
       if (multipleFieldEl === null || Number(multipleFieldEl.value) === 0) {
-        for (const existingOptionEl of fieldEl.querySelectorAll('option')) {
+        for (const existingOptionEl of fieldEl!.querySelectorAll('option')) {
           if (existingOptionEl.value === value) {
             addNewValue = false;
             break;
@@ -340,8 +339,8 @@ export default (function() {
 
         // Respect TCA maxitems for list-like fields and prevent inserting
         // additional values once the client-side limit is reached.
-        const maxItems = Number(fieldEl.dataset.maxitems ?? 0);
-        if (addNewValue && Number.isFinite(maxItems) && maxItems > 0 && fieldEl.querySelectorAll('option').length >= maxItems) {
+        const maxItems = Number(fieldEl!.dataset.maxitems ?? 0);
+        if (addNewValue && Number.isFinite(maxItems) && maxItems > 0 && fieldEl!.querySelectorAll('option').length >= maxItems) {
           addNewValue = false;
         }
 
@@ -366,16 +365,16 @@ export default (function() {
         option.value = value;
         option.title = title;
         option.text = label;
-        fieldEl.append(option);
+        fieldEl!.append(option);
 
         // set the hidden field
         FormEngine.updateHiddenFieldValueFromSelect(fieldEl, originalFieldEl);
 
         FormEngine.markFieldAsChanged(originalFieldEl);
-        FormEngine.Validation.validateField(fieldEl);
+        FormEngine.Validation.validateField(fieldEl!);
         FormEngine.Validation.validateField(availableFieldEl);
       }
-      if (!addNewValue && Number(fieldEl.dataset.maxitems ?? 0) > 0) {
+      if (!addNewValue && Number(fieldEl!.dataset.maxitems ?? 0) > 0) {
         FormEngine.showMaxItemsReachedNotice(fieldEl);
       }
 
@@ -392,8 +391,8 @@ export default (function() {
       }
 
       // Change the selected value
-      fieldEl.value = value;
-      FormEngine.Validation.validateField(fieldEl);
+      fieldEl!.value = value;
+      FormEngine.Validation.validateField(fieldEl!);
     }
   };
 
@@ -544,7 +543,7 @@ export default (function() {
     }).delegateTo(document, '.t3js-editform-delete-record');
 
     new RegularEvent('change', (event: Event, target: HTMLInputElement): void => {
-      target.closest('.t3js-formengine-field-item').classList.toggle('disabled');
+      target.closest('.t3js-formengine-field-item')!.classList.toggle('disabled');
     }).delegateTo(document, '.t3-form-field-eval-null-checkbox input[type="checkbox"]');
 
     new RegularEvent('change', (event: Event, target: HTMLInputElement): void => {
@@ -615,18 +614,15 @@ export default (function() {
       throw new BackendExceptionModule.BackendException('No interaction request given', 1496589980);
     }
 
-    let promiseControls: PromiseControls<void>;
+    const isConcerned = interactionRequest.concernsTypes(FormEngine.consumeTypes);
+    const outerMostRequest = interactionRequest.outerMostRequest;
     const promise = new Promise<void>((resolve, reject) => {
-      promiseControls = { resolve, reject };
+      if (isConcerned) {
+        FormEngine.interactionRequestMap.attachFor(outerMostRequest, { resolve, reject });
+      }
     });
 
-    if (interactionRequest.concernsTypes(FormEngine.consumeTypes)) {
-      const outerMostRequest = interactionRequest.outerMostRequest;
-
-      FormEngine.interactionRequestMap.attachFor(
-        outerMostRequest,
-        promiseControls
-      );
+    if (isConcerned) {
       // resolve or reject with previous user choice
       if (outerMostRequest.isProcessed()) {
         handleConsumeResponse(
@@ -693,13 +689,13 @@ export default (function() {
    */
   FormEngine.initializeMinimumCharactersLeftViews = function () {
     const addOrUpdateCounter = (minCharacterCountLeft: string, event: Event) => {
-      const parent = (event.currentTarget as HTMLInputElement).closest('.t3js-formengine-field-item');
+      const parent = (event.currentTarget as HTMLInputElement).closest('.t3js-formengine-field-item')!;
       const counter = parent.querySelector('.t3js-charcounter-min');
       const labelValue = coreCoreLabels.get('labels.remainingCharacters', {
         '0': minCharacterCountLeft
       });
       if (counter) {
-        counter.querySelector('span').innerHTML = labelValue;
+        counter.querySelector('span')!.innerHTML = labelValue;
       } else {
         const counter = document.createElement('div');
         counter.classList.add('t3js-charcounter-min');
@@ -718,7 +714,7 @@ export default (function() {
     };
     const removeCounter = (event: Event) => {
       const parent = (event.currentTarget as HTMLInputElement).closest('.t3js-formengine-field-item');
-      const counter = parent.querySelector('.t3js-charcounter-min');
+      const counter = parent!.querySelector('.t3js-charcounter-min');
       if (counter) {
         counter.remove();
       }
@@ -775,8 +771,8 @@ export default (function() {
     document.querySelectorAll<HTMLElement>('.t3-form-field-eval-null-checkbox').forEach((el) => {
       // Add disabled class to "t3js-formengine-field-item" if the null checkbox is NOT set,
       // This activates a CSS overlay "disabling" the input field and everything around.
-      const checkbox = el.querySelector<HTMLInputElement>('input[type="checkbox"]');
-      const fieldItem = el.closest('.t3js-formengine-field-item');
+      const checkbox = el.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
+      const fieldItem = el.closest('.t3js-formengine-field-item')!;
       if (!checkbox.checked) {
         fieldItem.classList.add('disabled');
       }
@@ -797,9 +793,9 @@ export default (function() {
    * depending on whether checkbox is checked or not
    */
   FormEngine.toggleCheckboxField = function(checkbox: HTMLInputElement, triggerFocusWhenChecked: boolean = true): void {
-    const item = checkbox.closest('.t3js-formengine-field-item');
-    const placeholder = item.querySelector<HTMLElement>('.t3js-formengine-placeholder-placeholder');
-    const formFieldWrapper = item.querySelector<HTMLElement>('.t3js-formengine-placeholder-formfield');
+    const item = checkbox.closest('.t3js-formengine-field-item')!;
+    const placeholder = item.querySelector<HTMLElement>('.t3js-formengine-placeholder-placeholder')!;
+    const formFieldWrapper = item.querySelector<HTMLElement>('.t3js-formengine-placeholder-formfield')!;
 
     if (checkbox.checked) {
       placeholder.hidden = true;
@@ -1060,7 +1056,7 @@ export default (function() {
     items.forEach((item) => {
       const handler = onFieldChangeHandlers.get(item.name);
       if (handler instanceof Function) {
-        handler.call(null, (item.data || null) as never, evt);
+        handler.call(null, (item.data || null) as never, evt!);
       }
     });
   };
@@ -1144,10 +1140,10 @@ export default (function() {
     switch(modalButtonName) {
       case 'discard':
         const previewWin = window.open(previewUrl, 'newTYPO3frontendWindow');
-        previewWin.focus();
+        previewWin!.focus();
 
-        if (Utility.urlsPointToSameServerSideResource(previewWin.location.href, previewUrl)) {
-          previewWin.location.reload();
+        if (Utility.urlsPointToSameServerSideResource(previewWin!.location.href, previewUrl)) {
+          previewWin!.location.reload();
         }
         break;
       case 'save':

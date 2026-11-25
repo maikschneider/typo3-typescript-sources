@@ -104,7 +104,7 @@ export class ColumnSelectorButton extends PseudoButtonLitElement {
    * @private
    */
   private static isColumnHidden(column: HTMLInputElement): boolean {
-    return column.closest(Selectors.columnsContainerSelector)?.classList.contains('hidden');
+    return column.closest(Selectors.columnsContainerSelector)?.classList.contains('hidden') ?? false;
   }
 
   /**
@@ -117,9 +117,9 @@ export class ColumnSelectorButton extends PseudoButtonLitElement {
    */
   private static filterColumns(columnsFilter: HTMLInputElement, columns: NodeListOf<HTMLInputElement>): void {
     columns.forEach((column) => {
-      const columnContainer = column.closest<HTMLDivElement>(Selectors.columnsContainerSelector);
+      const columnContainer = column.closest<HTMLDivElement>(Selectors.columnsContainerSelector)!;
       if (!column.disabled && columnContainer !== null) {
-        const filterValue: string = columnContainer.querySelector('.form-check-label')?.textContent;
+        const filterValue: string = columnContainer.querySelector('.form-check-label')?.textContent ?? '';
         if (filterValue && filterValue.length) {
           columnContainer.classList.toggle(
             'hidden',
@@ -204,10 +204,10 @@ export class ColumnSelectorButton extends PseudoButtonLitElement {
     });
 
     const columns: NodeListOf<HTMLInputElement> = currentModal.querySelectorAll(Selectors.columnsSelector);
-    const columnsFilter = currentModal.querySelector<HTMLInputElement>(Selectors.columnsFilterSelector);
-    const columnsSelectorActions = currentModal.querySelector<HTMLDivElement>(Selectors.columnsSelectorActionsSelector);
-    const selectAll = columnsSelectorActions.querySelector<HTMLButtonElement>('button[data-action="' + SelectorActions.all + '"]');
-    const selectNone = columnsSelectorActions.querySelector<HTMLButtonElement>('button[data-action="' + SelectorActions.none + '"]');
+    const columnsFilter = currentModal.querySelector<HTMLInputElement>(Selectors.columnsFilterSelector)!;
+    const columnsSelectorActions = currentModal.querySelector<HTMLDivElement>(Selectors.columnsSelectorActionsSelector)!;
+    const selectAll = columnsSelectorActions.querySelector<HTMLButtonElement>('button[data-action="' + SelectorActions.all + '"]')!;
+    const selectNone = columnsSelectorActions.querySelector<HTMLButtonElement>('button[data-action="' + SelectorActions.none + '"]')!;
 
     if (!columns.length || columnsFilter === null || selectAll === null || selectNone === null) {
       // Return in case required elements do not exist in the modal content
