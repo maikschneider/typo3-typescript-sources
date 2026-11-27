@@ -138,14 +138,14 @@ class Popover {
     popover.toggle();
   }
 
-  private toIterable(element: NodeListOf<HTMLElement> | HTMLElement | unknown): NodeListOf<HTMLElement> | HTMLElement[] {
+  private toIterable(element: unknown): NodeListOf<HTMLElement> | HTMLElement[] {
     let elementList: NodeListOf<HTMLElement> | HTMLElement[];
     if (element instanceof HTMLElement) {
       elementList = [element];
     } else if (element instanceof NodeList) {
       elementList = element as NodeListOf<HTMLElement>;
     } else {
-      throw `Cannot consume element of type ${(element as object).constructor.name}, expected NodeListOf<HTMLElement> or HTMLElement`;
+      throw new Error(`Cannot consume element of type ${(element as object).constructor.name}, expected NodeListOf<HTMLElement> or HTMLElement`);
     }
 
     return elementList;
